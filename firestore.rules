@@ -1,0 +1,98 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ==========================================
+    // HELPER FUNCTIONS
+    // ==========================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isSuperAdmin() {
+      return isAuthenticated() && request.auth.token.role == 'SUPER_ADMIN';
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    function isAssignedTranslator(translatorId) {
+      return isAuthenticated() && 
+             request.auth.token.role == 'TRANSLATOR' && 
+             request.auth.token.translatorProfileId == translatorId;
+    }
+
+    // ==========================================
+    // RULES FOR COLLECTIONS
+    // ==========================================
+
+    match /users/{userId} {
+      allow read: if isSuperAdmin() || isOwner(userId);
+      allow create: if isAuthenticated() && request.resource.data.role == 'TRANSLATOR';
+      allow update: if isSuperAdmin() || (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']));
+      allow delete: if isSuperAdmin();
+    }
+
+    match /translator_profiles/{profileId} {
+      allow read: if isAuthenticated();
+      allow create, delete: if isSuperAdmin();
+      allow update: if isSuperAdmin() || (
+        isAssignedTranslator(profileId) && 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'avatarUrl', 'phone'])
+      );
+    }
+
+    match /languages/{languageId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
+    }
+
+    match /assignments/{assignmentId} {
+      allow read: if isSuperAdmin() || isAssignedTranslator(resource.data.translatorId);
+      allow create, delete: if isSuperAdmin();
+      allow update: if isSuperAdmin() || (
+        isAssignedTranslator(resource.data.translatorId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'startedAt', 'submittedAt', 'resultFileName', 'resultFileUrl', 
+          'submissionNotes', 'totalWorkingSeconds', 'totalIdleSeconds'
+        ]) &&
+        request.resource.data.status != 'COMPLETED' &&
+        request.resource.data.status != 'CANCELLED'
+      );
+    }
+
+    match /timer_logs/{logId} {
+      allow read: if isSuperAdmin() || isAssignedTranslator(resource.data.translatorId);
+      allow create: if isAuthenticated() && request.resource.data.translatorId == request.auth.token.translatorProfileId;
+      allow update: if isSuperAdmin() || (
+        isAssignedTranslator(resource.data.translatorId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['endTime', 'durationSeconds', 'reason'])
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    match /notifications/{notifId} {
+      allow read: if isSuperAdmin() || isOwner(resource.data.targetUserId);
+      allow write: if isSuperAdmin();
+    }
+
+    match /system_settings/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
+    }
+
+    match /audit_logs/{logId} {
+      allow read: if isSuperAdmin();
+      allow create: if isAuthenticated(); // written by client but immutable
+      allow update, delete: if false; // Audit logs must be immutable
+    }
+
+    match /activity_logs/{logId} {
+      allow read: if isSuperAdmin();
+      allow create: if isAuthenticated();
+      allow update, delete: if false; // Activity logs are write-once
+    }
+  }
+}
