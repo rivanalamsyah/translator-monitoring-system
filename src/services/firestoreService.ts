@@ -27,8 +27,11 @@ import {
   Timestamp,
   DocumentData,
   Unsubscribe,
+  writeBatch,
+  getDocs,
 } from 'firebase/firestore';
-import { getFirebaseDb } from '../lib/firebase';
+import { getFirebaseDb, getFirebaseApp } from '../lib/firebase';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import {
   TranslatorProfile,
   Assignment,
@@ -63,6 +66,14 @@ function mapTranslator(id: string, data: DocumentData): TranslatorProfile {
     activeAssignmentId: data.activeAssignmentId,
     completedJobsCount: data.completedJobsCount || 0,
     rating: data.rating || 5.0,
+    address: data.address || '',
+    certifications: data.certifications || [],
+    specialties: data.specialties || [],
+    paymentAccount: data.paymentAccount || '',
+    supportingDocuments: data.supportingDocuments || [],
+    availability: data.availability || '',
+    updatedAt: data.updatedAt || '',
+    version: data.version || 1,
   };
 }
 
@@ -114,10 +125,14 @@ export function subscribeTranslators(
 }
 
 export function subscribeAssignments(
+  translatorId: string | undefined,
   callback: (data: Assignment[]) => void
 ): Unsubscribe {
   const db = getFirebaseDb();
-  const q = query(collection(db, 'assignments'), orderBy('createdAt', 'desc'));
+  const constraints = translatorId
+    ? [where('translatorId', '==', translatorId), orderBy('createdAt', 'desc')]
+    : [orderBy('createdAt', 'desc')];
+  const q = query(collection(db, 'assignments'), ...constraints);
   return onSnapshot(q, (snap) => {
     callback(snap.docs.map((d) => mapAssignment(d.id, d.data())));
   });
@@ -144,20 +159,19 @@ export function subscribeNotifications(
   callback: (data: SystemNotification[]) => void
 ): Unsubscribe {
   const db = getFirebaseDb();
-  // Ambil notifikasi untuk user spesifik + notifikasi 'ALL'
   const q = query(
     collection(db, 'notifications'),
+    where('userId', 'in', ['ALL', userId]),
     orderBy('createdAt', 'desc')
   );
   return onSnapshot(q, (snap) => {
-    const all = snap.docs
-      .map((d) => ({
+    callback(
+      snap.docs.map((d) => ({
         id: d.id,
         ...d.data(),
         createdAt: toISO(d.data().createdAt),
       } as SystemNotification))
-      .filter((n) => n.userId === 'ALL' || n.userId === userId);
-    callback(all);
+    );
   });
 }
 
@@ -244,7 +258,7 @@ export async function fsDeleteTranslator(id: string): Promise<void> {
 
 // ─── Activity Logs ────────────────────────────────────────────────────────────
 
-export async function fsAddActivityLog(data: Omit<ActivityLogItem, 'id'>): Promise<void> {
+export async function fsAddActivityLog(data: Omit<ActivityLogItem, 'id' | 'timestamp'>): Promise<void> {
   const db = getFirebaseDb();
   await addDoc(collection(db, 'activity_logs'), {
     ...data,
@@ -254,7 +268,7 @@ export async function fsAddActivityLog(data: Omit<ActivityLogItem, 'id'>): Promi
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 
-export async function fsAddNotification(data: Omit<SystemNotification, 'id'>): Promise<void> {
+export async function fsAddNotification(data: Omit<SystemNotification, 'id' | 'createdAt'>): Promise<void> {
   const db = getFirebaseDb();
   await addDoc(collection(db, 'notifications'), {
     ...data,
@@ -268,14 +282,19 @@ export async function fsMarkNotificationRead(id: string): Promise<void> {
 }
 
 export async function fsClearNotifications(userId: string): Promise<void> {
-  // Catatan: batch delete tidak tersedia di Firestore Web SDK secara langsung.
-  // Untuk implementasi production, gunakan Cloud Function.
-  console.warn('[TMS] fsClearNotifications: Use a Cloud Function for batch delete in production.');
+  const db = getFirebaseDb();
+  const q = query(collection(db, 'notifications'), where('userId', 'in', ['ALL', userId]));
+  const snap = await getDocs(q);
+  const batch = writeBatch(db);
+  snap.docs.forEach((doc) => {
+    batch.delete(doc.ref);
+  });
+  await batch.commit();
 }
 
 // ─── Timer Logs ────────────────────────────────────────────────────────────────
 
-export async function fsAddTimerLog(data: Omit<TimerLog, 'id'>): Promise<string> {
+export async function fsAddTimerLog(data: Omit<TimerLog, 'id' | 'startTime'>): Promise<string> {
   const db = getFirebaseDb();
   const ref = await addDoc(collection(db, 'timer_logs'), {
     ...data,
@@ -294,4 +313,18 @@ export async function fsUpdateTimerLog(id: string, data: Partial<TimerLog>): Pro
 export async function fsUpdateSettings(data: SystemSettings): Promise<void> {
   const db = getFirebaseDb();
   await setDoc(doc(db, 'system_settings', 'main'), data, { merge: true });
+}
+
+// ─── Cloud Functions Callables ───────────────────────────────────────────────
+
+export async function fsSubmitAssignmentCallable(payload: {
+  assignmentId: string;
+  resultFileName: string;
+  resultFileUrl: string;
+  submissionNotes?: string;
+}): Promise<void> {
+  const appInstance = getFirebaseApp();
+  const functions = getFunctions(appInstance);
+  const submitCallable = httpsCallable(functions, 'submitAssignmentCallable');
+  await submitCallable(payload);
 }

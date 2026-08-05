@@ -33,8 +33,16 @@ export const TranslatorProfileView: React.FC = () => {
   const { currentTranslatorProfile, assignments, updateTranslator, settings } = useApp();
 
   const [isEditing, setIsEditing] = useState(false);
-  const [editPhone, setEditPhone] = useState(currentTranslatorProfile?.phone || '');
   const [editName, setEditName] = useState(currentTranslatorProfile?.name || '');
+  const [editPhone, setEditPhone] = useState(currentTranslatorProfile?.phone || '');
+  const [editAddress, setEditAddress] = useState(currentTranslatorProfile?.address || '');
+  const [editLanguages, setEditLanguages] = useState<string[]>(currentTranslatorProfile?.languages || []);
+  const [editCertifications, setEditCertifications] = useState(currentTranslatorProfile?.certifications?.join(', ') || '');
+  const [editSpecialties, setEditSpecialties] = useState(currentTranslatorProfile?.specialties?.join(', ') || '');
+  const [editPaymentAccount, setEditPaymentAccount] = useState(currentTranslatorProfile?.paymentAccount || '');
+  const [editSupportingDocs, setEditSupportingDocs] = useState(currentTranslatorProfile?.supportingDocuments?.join(', ') || '');
+  const [editAvailability, setEditAvailability] = useState(currentTranslatorProfile?.availability || '');
+  const [editStatus, setEditStatus] = useState(currentTranslatorProfile?.status || 'READY');
 
   if (!currentTranslatorProfile) {
     return (
@@ -70,15 +78,42 @@ export const TranslatorProfileView: React.FC = () => {
         : 'bg-pink-500';
 
   const handleSaveEdit = () => {
-    updateTranslator(currentTranslatorProfile.id, {
-      name: editName.trim() || currentTranslatorProfile.name,
-      phone: editPhone.trim() || currentTranslatorProfile.phone,
-    });
+    updateTranslator(
+      currentTranslatorProfile.id,
+      {
+        name: editName.trim() || currentTranslatorProfile.name,
+        phone: editPhone.trim() || currentTranslatorProfile.phone,
+        address: editAddress.trim(),
+        languages: editLanguages.length > 0 ? editLanguages : currentTranslatorProfile.languages,
+        certifications: editCertifications
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+        specialties: editSpecialties
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+        paymentAccount: editPaymentAccount.trim(),
+        supportingDocuments: editSupportingDocs
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean),
+        availability: editAvailability.trim(),
+        status: editStatus,
+      },
+      currentTranslatorProfile.version
+    );
     setIsEditing(false);
   };
 
   const handleAvatarUpload = (newAvatarUrl: string) => {
-    updateTranslator(currentTranslatorProfile.id, { avatar: newAvatarUrl });
+    updateTranslator(currentTranslatorProfile.id, { avatar: newAvatarUrl }, currentTranslatorProfile.version);
+  };
+
+  const toggleLanguage = (code: string) => {
+    setEditLanguages((prev) =>
+      prev.includes(code) ? prev.filter((c) => c !== code) : [...prev, code]
+    );
   };
 
   return (
@@ -93,7 +128,7 @@ export const TranslatorProfileView: React.FC = () => {
         </div>
         <h2 className="text-xl font-bold text-white">Kelola Identitas & Beban Kerja Anda</h2>
         <p className="text-xs text-pink-100/80 mt-1">
-          Perbarui data kontak, unggah foto profil, dan pantau kapasitas terjemahan Anda secara real-time.
+          Perbarui data kontak, unggah foto profil, detail keahlian, administrasi, dan pantau kapasitas terjemahan Anda secara real-time.
         </p>
       </div>
 
@@ -117,6 +152,12 @@ export const TranslatorProfileView: React.FC = () => {
               translatorId={currentTranslatorProfile.id}
               onUploadComplete={handleAvatarUpload}
             />
+
+            {currentTranslatorProfile.updatedAt && (
+              <div className="text-[10px] text-slate-400 text-center font-mono">
+                Terakhir diupdate: {new Date(currentTranslatorProfile.updatedAt).toLocaleString()} (Versi: {currentTranslatorProfile.version || 1})
+              </div>
+            )}
           </div>
 
           {/* Workload Capacity Gauge */}
@@ -128,7 +169,6 @@ export const TranslatorProfileView: React.FC = () => {
 
             {/* Visual Gauge */}
             <div className="text-center space-y-3">
-              {/* Circular-style gauge with CSS */}
               <div className="relative mx-auto w-36 h-36">
                 <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
                   <circle
@@ -167,19 +207,6 @@ export const TranslatorProfileView: React.FC = () => {
                   <p className="text-[10px] text-slate-400">Maksimal (pt)</p>
                 </div>
               </div>
-
-              {/* Progress bar */}
-              <div className="space-y-1">
-                <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all duration-700 ${utilisasiColor}`}
-                    style={{ width: `${utilisasi}%` }}
-                  />
-                </div>
-                <p className="text-[10px] text-slate-400 font-mono text-center">
-                  {currentTranslatorProfile.currentLoadPoints} / {currentTranslatorProfile.maxCapacityPoints} poin terpakai
-                </p>
-              </div>
             </div>
           </div>
         </div>
@@ -187,36 +214,44 @@ export const TranslatorProfileView: React.FC = () => {
         {/* Right 2 cols: Info & Stats */}
         <div className="lg:col-span-2 space-y-4">
           {/* Data Profil */}
-          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs space-y-4">
-            <div className="flex items-center justify-between">
+          <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs space-y-6">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
                 <Edit3 className="h-4 w-4 text-pink-600" />
-                <span>Data Profil Penerjemah</span>
+                <span>Detail Profil Penerjemah</span>
               </h3>
               {!isEditing ? (
                 <button
                   onClick={() => {
                     setEditName(currentTranslatorProfile.name);
                     setEditPhone(currentTranslatorProfile.phone);
+                    setEditAddress(currentTranslatorProfile.address || '');
+                    setEditLanguages(currentTranslatorProfile.languages || []);
+                    setEditCertifications(currentTranslatorProfile.certifications?.join(', ') || '');
+                    setEditSpecialties(currentTranslatorProfile.specialties?.join(', ') || '');
+                    setEditPaymentAccount(currentTranslatorProfile.paymentAccount || '');
+                    setEditSupportingDocs(currentTranslatorProfile.supportingDocuments?.join(', ') || '');
+                    setEditAvailability(currentTranslatorProfile.availability || '');
+                    setEditStatus(currentTranslatorProfile.status || 'READY');
                     setIsEditing(true);
                   }}
                   className="flex items-center gap-1.5 rounded-lg border border-pink-200 bg-pink-50 hover:bg-pink-100 text-pink-700 px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
                 >
                   <Edit3 className="h-3.5 w-3.5" />
-                  <span>Edit</span>
+                  <span>Edit Profil</span>
                 </button>
               ) : (
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleSaveEdit}
-                    className="flex items-center gap-1.5 rounded-lg bg-pink-600 hover:bg-pink-700 text-white px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 rounded-lg bg-pink-600 hover:bg-pink-700 text-white px-4 py-1.5 text-xs font-bold transition-colors cursor-pointer"
                   >
                     <Save className="h-3.5 w-3.5" />
                     <span>Simpan</span>
                   </button>
                   <button
                     onClick={() => setIsEditing(false)}
-                    className="flex items-center gap-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
+                    className="flex items-center gap-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-655 px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
                   >
                     <X className="h-3.5 w-3.5" />
                     <span>Batal</span>
@@ -225,93 +260,259 @@ export const TranslatorProfileView: React.FC = () => {
               )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Nama */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1">
-                  <User className="h-3 w-3" /> Nama Lengkap
-                </label>
-                {isEditing ? (
+            {isEditing ? (
+              <div className="space-y-4">
+                {/* Row 1 */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-600">Nama Lengkap</label>
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-pink-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-600">Nomor WhatsApp / Telp</label>
+                    <input
+                      type="text"
+                      value={editPhone}
+                      onChange={(e) => setEditPhone(e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-pink-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Email read only */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-600">Alamat Email (Akun)</label>
+                  <input
+                    type="email"
+                    disabled
+                    value={currentTranslatorProfile.email}
+                    className="w-full rounded-lg border border-slate-200 bg-slate-100/50 px-3 py-2 text-xs text-slate-400 cursor-not-allowed"
+                  />
+                </div>
+
+                {/* Address */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-600">Alamat Rumah</label>
                   <input
                     type="text"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="w-full rounded-lg border border-pink-300 bg-pink-50/30 px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:border-pink-500 transition-colors"
+                    value={editAddress}
+                    onChange={(e) => setEditAddress(e.target.value)}
+                    placeholder="contoh: Jl. Sudirman No. 12, Jakarta"
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-pink-500"
                   />
-                ) : (
-                  <p className="text-sm font-bold text-slate-800 px-3 py-2 rounded-lg bg-slate-50 border border-slate-100">
-                    {currentTranslatorProfile.name}
-                  </p>
-                )}
-              </div>
+                </div>
 
-              {/* Email (read-only) */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1">
-                  <Mail className="h-3 w-3" /> Email Akun
-                </label>
-                <p className="text-sm text-slate-500 px-3 py-2 rounded-lg bg-slate-50 border border-slate-100 truncate">
-                  {currentTranslatorProfile.email}
-                </p>
-              </div>
+                {/* Languages Select */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-600">Bahasa yang Dikuasai</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {settings.languageRules.map((rule) => {
+                      const isSelected = editLanguages.includes(rule.languageCode);
+                      return (
+                        <button
+                          key={rule.languageCode}
+                          type="button"
+                          onClick={() => toggleLanguage(rule.languageCode)}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all text-center cursor-pointer ${
+                            isSelected
+                              ? 'bg-pink-600 text-white border-pink-600 shadow-sm'
+                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          {rule.languageCode}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
-              {/* Telepon */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1">
-                  <Phone className="h-3 w-3" /> Nomor Telepon
-                </label>
-                {isEditing ? (
+                {/* Certifications & Specialties */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-600">Sertifikasi (Pisahkan dengan koma)</label>
+                    <input
+                      type="text"
+                      value={editCertifications}
+                      onChange={(e) => setEditCertifications(e.target.value)}
+                      placeholder="contoh: HPI Certified, ATA Certified"
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-pink-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-semibold text-slate-600">Spesialisasi (Pisahkan dengan koma)</label>
+                    <input
+                      type="text"
+                      value={editSpecialties}
+                      onChange={(e) => setEditSpecialties(e.target.value)}
+                      placeholder="contoh: Legal, Medical, Finance"
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-pink-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Payment Account */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-600">Rekening Pembayaran</label>
                   <input
-                    type="tel"
-                    value={editPhone}
-                    onChange={(e) => setEditPhone(e.target.value)}
-                    className="w-full rounded-lg border border-pink-300 bg-pink-50/30 px-3 py-2 text-sm font-semibold text-slate-800 focus:outline-none focus:border-pink-500 transition-colors"
+                    type="text"
+                    value={editPaymentAccount}
+                    onChange={(e) => setEditPaymentAccount(e.target.value)}
+                    placeholder="contoh: Bank BCA 1234567890 a/n Ahmad Rizky"
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-pink-500"
                   />
-                ) : (
-                  <p className="text-sm font-semibold text-slate-800 px-3 py-2 rounded-lg bg-slate-50 border border-slate-100">
-                    {currentTranslatorProfile.phone}
-                  </p>
-                )}
-              </div>
+                </div>
 
-              {/* Rating */}
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1">
-                  <Star className="h-3 w-3" /> Skor Penilaian
-                </label>
-                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-100">
-                  <Star className="h-4 w-4 fill-amber-500 text-amber-500 shrink-0" />
-                  <span className="text-sm font-black text-amber-700 font-mono">
-                    {currentTranslatorProfile.rating} / 5.0
-                  </span>
+                {/* Supporting Docs */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-600">Dokumen Pendukung / Link Portofolio (Koma)</label>
+                  <input
+                    type="text"
+                    value={editSupportingDocs}
+                    onChange={(e) => setEditSupportingDocs(e.target.value)}
+                    placeholder="contoh: CV.pdf, Ijazah.pdf, link_drive_portofolio"
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-pink-500"
+                  />
+                </div>
+
+                {/* Availability */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-600">Jadwal Ketersediaan</label>
+                  <textarea
+                    rows={2}
+                    value={editAvailability}
+                    onChange={(e) => setEditAvailability(e.target.value)}
+                    placeholder="contoh: Senin - Jumat (09:00 - 18:00 WIB)"
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-800 focus:outline-none focus:border-pink-500"
+                  />
+                </div>
+
+                {/* Status Dropdown */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-600">Status Ketersediaan</label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value as any)}
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-pink-500"
+                  >
+                    <option value="READY">Ready (Aktif & Siap Menerima Tugas)</option>
+                    <option value="OFFLINE">Offline (Tidak Aktif)</option>
+                    <option value="ON_LEAVE">On Leave (Sedang Cuti)</option>
+                  </select>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-slate-700">
+                {/* Nama */}
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold uppercase text-slate-400">Nama Lengkap</p>
+                  <p className="font-bold text-slate-800">{currentTranslatorProfile.name}</p>
+                </div>
 
-            {/* Languages */}
-            <div className="space-y-2 pt-2 border-t border-slate-100">
-              <label className="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1">
-                <Languages className="h-3 w-3" /> Bahasa yang Dikuasai
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {currentTranslatorProfile.languages.map((lang) => {
-                  const rule = settings.languageRules.find((r) => r.languageCode === lang);
-                  return (
-                    <div
-                      key={lang}
-                      className="rounded-lg bg-pink-50 border border-pink-100 px-3 py-1.5 text-xs flex items-center gap-2"
-                    >
-                      <span className="font-bold text-pink-700">{lang}</span>
-                      {rule && (
-                        <span className="text-[10px] text-pink-500 font-mono">
-                          {rule.pointsPerPage} pt/hlm
+                {/* WhatsApp */}
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold uppercase text-slate-400">WhatsApp / Telp</p>
+                  <p className="font-semibold text-slate-800">{currentTranslatorProfile.phone}</p>
+                </div>
+
+                {/* Email */}
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold uppercase text-slate-400">Email Akun</p>
+                  <p className="text-slate-600 truncate">{currentTranslatorProfile.email}</p>
+                </div>
+
+                {/* Address */}
+                <div className="space-y-1">
+                  <p className="text-[10px] font-bold uppercase text-slate-400">Alamat</p>
+                  <p className="text-slate-600">{currentTranslatorProfile.address || '-'}</p>
+                </div>
+
+                {/* Languages */}
+                <div className="space-y-1 sm:col-span-2">
+                  <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">Bahasa yang Dikuasai</p>
+                  <div className="flex flex-wrap gap-1">
+                    {currentTranslatorProfile.languages.map((l) => (
+                      <span key={l} className="rounded bg-pink-50 text-pink-600 px-2 py-0.5 font-semibold text-[10px] border border-pink-100">
+                        {l}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Specialties */}
+                <div className="space-y-1 sm:col-span-2">
+                  <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">Spesialisasi</p>
+                  {currentTranslatorProfile.specialties && currentTranslatorProfile.specialties.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {currentTranslatorProfile.specialties.map((s) => (
+                        <span key={s} className="rounded bg-purple-50 text-purple-600 px-2 py-0.5 font-semibold text-[10px] border border-purple-100">
+                          {s}
                         </span>
-                      )}
+                      ))}
                     </div>
-                  );
-                })}
+                  ) : (
+                    <p className="text-slate-400 italic text-[11px]">- Belum ada spesialisasi -</p>
+                  )}
+                </div>
+
+                {/* Certifications */}
+                <div className="space-y-1 sm:col-span-2">
+                  <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">Sertifikasi</p>
+                  {currentTranslatorProfile.certifications && currentTranslatorProfile.certifications.length > 0 ? (
+                    <div className="flex flex-wrap gap-1">
+                      {currentTranslatorProfile.certifications.map((c) => (
+                        <span key={c} className="rounded bg-teal-50 text-teal-600 px-2 py-0.5 font-semibold text-[10px] border border-teal-100">
+                          {c}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-slate-400 italic text-[11px]">- Belum ada sertifikasi -</p>
+                  )}
+                </div>
+
+                {/* Payment Account */}
+                <div className="space-y-1 sm:col-span-2">
+                  <p className="text-[10px] font-bold uppercase text-slate-400">Rekening Pembayaran</p>
+                  <p className="text-slate-700 bg-slate-50 border border-slate-100 rounded-lg p-2 font-mono">
+                    {currentTranslatorProfile.paymentAccount || '-'}
+                  </p>
+                </div>
+
+                {/* Supporting Documents */}
+                <div className="space-y-1 sm:col-span-2">
+                  <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">Dokumen Pendukung / Portofolio</p>
+                  {currentTranslatorProfile.supportingDocuments && currentTranslatorProfile.supportingDocuments.length > 0 ? (
+                    <div className="space-y-1">
+                      {currentTranslatorProfile.supportingDocuments.map((doc, idx) => (
+                        <div key={idx} className="flex items-center gap-1.5 bg-slate-50 border border-slate-150 p-2 rounded-lg truncate text-[11px]">
+                          <span className="font-bold text-slate-700">Link #{idx+1}:</span>
+                          <a href={doc.startsWith('http') ? doc : '#'} target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:underline truncate">
+                            {doc}
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-slate-400 italic text-[11px]">- Belum ada dokumen pendukung -</p>
+                  )}
+                </div>
+
+                {/* Availability */}
+                <div className="space-y-1 sm:col-span-2">
+                  <p className="text-[10px] font-bold uppercase text-slate-400">Jadwal Ketersediaan</p>
+                  <p className="text-slate-700 bg-slate-50 border border-slate-100 rounded-lg p-2 italic">
+                    {currentTranslatorProfile.availability || '-'}
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Statistik Ringkas */}
@@ -393,3 +594,4 @@ export const TranslatorProfileView: React.FC = () => {
     </div>
   );
 };
+

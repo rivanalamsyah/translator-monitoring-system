@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   Clock,
@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   Download,
+  Link2,
 } from 'lucide-react';
 import { StatusBadge, PriorityBadge } from '../common/Badge';
 import { formatClock, formatDuration, formatDate } from '../../utils/formatters';
@@ -21,8 +22,14 @@ export const TranslatorDashboard: React.FC = () => {
     resumeAssignmentTimer,
     setActivePauseAssignment,
     setActiveSubmitAssignment,
+    submitAssignment,
     timerLogs,
   } = useApp();
+
+  const [driveUrl, setDriveUrl] = useState('');
+  const [isAccessConfirmed, setIsAccessConfirmed] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!currentTranslatorProfile) {
     return <div className="p-8 text-center text-slate-400 font-medium">Memuat ruang kerja penerjemah...</div>;
@@ -35,6 +42,44 @@ export const TranslatorDashboard: React.FC = () => {
   const activeJob = myAssignments.find(
     (a) => a.status === 'WORKING' || a.status === 'PAUSED' || a.status === 'REVISION' || a.status === 'ASSIGNED'
   );
+
+  useEffect(() => {
+    if (activeJob) {
+      setDriveUrl(activeJob.resultFileUrl || '');
+    } else {
+      setDriveUrl('');
+    }
+    setErrorMsg('');
+    setIsAccessConfirmed(false);
+  }, [activeJob?.id, activeJob?.resultFileUrl]);
+
+  const handleDriveSubmit = () => {
+    setErrorMsg('');
+    if (!activeJob) return;
+
+    if (!driveUrl.trim()) {
+      setErrorMsg('Tautan Google Drive tidak boleh kosong.');
+      return;
+    }
+
+    // Validate link
+    const gdriveRegex = /^(https?:\/\/)?((drive|docs|sheets|slides|forms)\.google\.com)\/[a-zA-Z0-9_\-\.\/\?&=\+]+/i;
+    if (!gdriveRegex.test(driveUrl.trim())) {
+      setErrorMsg('Format tautan tidak valid. Gunakan URL Google Drive yang benar (contoh: https://drive.google.com/file/d/...).');
+      return;
+    }
+
+    if (!isAccessConfirmed) {
+      setErrorMsg('Anda harus mencentang kotak konfirmasi izin akses link.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setTimeout(() => {
+      submitAssignment(activeJob.id, driveUrl.trim(), 'Hasil dikirim langsung dari halaman detail tugas.');
+      setIsSubmitting(false);
+    }, 600);
+  };
 
   const completedCount = myAssignments.filter((a) => a.status === 'COMPLETED').length;
   const revisionCount = myAssignments.filter((a) => a.status === 'REVISION').length;
@@ -178,6 +223,49 @@ export const TranslatorDashboard: React.FC = () => {
                   <Download className="h-3.5 w-3.5" />
                   <span>Unduh Sumber</span>
                 </button>
+              </div>
+
+              {/* Google Drive Link Submission Section */}
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3 text-left">
+                <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Link2 className="h-4.5 w-4.5 text-pink-600" />
+                  <span>Kirim Hasil Terjemahan (Tautan Google Drive)</span>
+                </p>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 focus-within:border-pink-500 transition-colors">
+                    <Link2 className="h-4 w-4 text-pink-500" />
+                    <input
+                      type="text"
+                      placeholder="https://drive.google.com/file/d/.../view"
+                      value={driveUrl}
+                      onChange={(e) => setDriveUrl(e.target.value)}
+                      className="w-full bg-transparent text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none"
+                    />
+                  </div>
+                  {errorMsg && <p className="text-[11px] text-rose-600 font-medium">{errorMsg}</p>}
+                  
+                  <div className="flex items-start gap-2 bg-white border border-slate-150 p-2.5 rounded-lg">
+                    <input
+                      type="checkbox"
+                      id="confirm-dashboard-permission"
+                      checked={isAccessConfirmed}
+                      onChange={(e) => setIsAccessConfirmed(e.target.checked)}
+                      className="mt-0.5 h-3.5 w-3.5 rounded border-slate-350 text-pink-600 focus:ring-pink-500 cursor-pointer"
+                    />
+                    <label htmlFor="confirm-dashboard-permission" className="text-[10px] text-slate-500 leading-normal cursor-pointer">
+                      Saya mengonfirmasi bahwa link Google Drive ini diatur ke <strong>"Anyone with the link can view"</strong> (Siapa saja yang memiliki link dapat melihat) agar Admin dapat melakukan review.
+                    </label>
+                  </div>
+                  
+                  <button
+                    onClick={handleDriveSubmit}
+                    disabled={isSubmitting}
+                    className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-pink-600 hover:bg-pink-700 disabled:opacity-50 text-white py-2.5 text-xs font-bold transition-all shadow-md shadow-pink-600/10 cursor-pointer"
+                  >
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>{isSubmitting ? 'Mengirim...' : 'Kirim Hasil Terjemahan'}</span>
+                  </button>
+                </div>
               </div>
 
               {/* DIGITAL TIMER CONTROLLER */}

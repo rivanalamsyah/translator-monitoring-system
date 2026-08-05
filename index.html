@@ -1,36 +1,118 @@
 <!doctype html>
-<html lang="en">
+<html lang="id">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- ── Favicon ── -->
     <link rel="icon" type="image/webp" href="/assets/favicon.webp" />
     <link rel="shortcut icon" type="image/webp" href="/assets/favicon.webp" />
+
+    <!-- ── PWA: Web App Manifest ── -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- ── PWA: Theme Color ── -->
+    <meta name="theme-color" content="#ec4899" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#db2777" media="(prefers-color-scheme: dark)" />
+
+    <!-- ── PWA: Apple/iOS Meta ── -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Master Translate" />
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+    <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-192x192.png" />
+
+    <!-- ── PWA: Microsoft/Windows ── -->
+    <meta name="msapplication-TileColor" content="#ec4899" />
+    <meta name="msapplication-TileImage" content="/icons/icon-144x144.png" />
+    <meta name="msapplication-config" content="none" />
+
+    <!-- ── SEO ── -->
     <title>Sistem Monitoring Penerjemah by Master Translate</title>
     <meta name="description" content="Sistem Monitoring Penerjemah by Master Translate - Kelola penerjemah profesional, pemantauan waktu tugas langsung, kapasitas beban kerja, dan kepatuhan SLA." />
-    <!-- Open Graph / Facebook -->
+    <meta name="application-name" content="Master Translate" />
+    <meta name="author" content="Master Translate" />
+    <meta name="robots" content="noindex, nofollow" />
+
+    <!-- ── Open Graph / Facebook ── -->
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Sistem Monitoring Penerjemah by Master Translate" />
     <meta property="og:description" content="Kelola penerjemah profesional, pemantauan waktu tugas langsung, kapasitas beban kerja, dan kepatuhan SLA." />
-    <!-- Twitter -->
+    <meta property="og:image" content="/icons/icon-512x512.png" />
+
+    <!-- ── Twitter ── -->
     <meta property="twitter:card" content="summary_large_image" />
     <meta property="twitter:title" content="Sistem Monitoring Penerjemah by Master Translate" />
     <meta property="twitter:description" content="Kelola penerjemah profesional, pemantauan waktu tugas langsung, kapasitas beban kerja, dan kepatuhan SLA." />
-    <!-- Google Fonts -->
+    <meta property="twitter:image" content="/icons/icon-512x512.png" />
+
+    <!-- ── Google Fonts ── -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300..700&family=Quicksand:wght@300..700&display=swap" rel="stylesheet" />
+
     <style>
+      /* Critical inline styles — prevent FOUC */
       body {
         font-family: 'Quicksand', sans-serif;
+        background-color: #F8FAFC;
+        margin: 0;
+        padding: 0;
       }
       h1, h2, h3, h4, h5, h6, .font-sans {
         font-family: 'Fredoka', sans-serif;
       }
+
+      /* Measure scrollbar width to prevent layout shift on scroll lock */
+      :root {
+        --scrollbar-width: 0px;
+      }
     </style>
+
+    <!-- ── Measure scrollbar width on load ── -->
+    <script>
+      (function () {
+        var div = document.createElement('div');
+        div.style.cssText = 'width:100px;height:100px;overflow:scroll;position:absolute;top:-9999px;';
+        document.documentElement.appendChild(div);
+        var scrollbarWidth = div.offsetWidth - div.clientWidth;
+        document.documentElement.removeChild(div);
+        document.documentElement.style.setProperty('--scrollbar-width', scrollbarWidth + 'px');
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+
+    <!-- ── Service Worker Registration ── -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker
+            .register('/sw.js', { scope: '/' })
+            .then(function (registration) {
+              console.log('[TMS] Service Worker registered. Scope:', registration.scope);
+
+              // Check for updates
+              registration.addEventListener('updatefound', function () {
+                var newWorker = registration.installing;
+                if (newWorker) {
+                  newWorker.addEventListener('statechange', function () {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                      console.log('[TMS] New Service Worker available. Reload to update.');
+                    }
+                  });
+                }
+              });
+            })
+            .catch(function (err) {
+              console.warn('[TMS] Service Worker registration failed:', err);
+            });
+        });
+      }
+    </script>
   </body>
 </html>
-

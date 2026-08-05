@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { X, CheckCircle, AlertTriangle, FileCheck, Download } from 'lucide-react';
+import { X, CheckCircle, AlertTriangle, FileCheck } from 'lucide-react';
 import { formatDuration } from '../../utils/formatters';
 
 export const ReviewSubmissionModal: React.FC = () => {
@@ -79,24 +79,25 @@ export const ReviewSubmissionModal: React.FC = () => {
             </div>
           </div>
 
-          {/* Submitted File */}
-          <div className="rounded-lg border border-pink-100 bg-pink-50/70 p-3 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <FileCheck className="h-5 w-5 text-pink-600" />
-              <div>
-                <p className="text-xs font-bold text-pink-700">
-                  {activeReviewAssignment.resultFileName || 'Hasil_Terjemahan_Final.docx'}
-                </p>
-                <p className="text-[10px] text-pink-500/80">Berkas hasil terjemahan siap untuk diaudit</p>
+          {/* Submitted Google Drive Link */}
+          <div className="rounded-lg border border-pink-100 bg-pink-50/70 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-2.5 min-w-0">
+              <FileCheck className="h-5 w-5 text-pink-600 mt-0.5 shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-pink-700">Tautan Hasil Pekerjaan (Google Drive):</p>
+                <p className="text-[10px] text-slate-500 truncate font-mono mt-0.5">{activeReviewAssignment.resultFileUrl || '-'}</p>
               </div>
             </div>
-            <button
-              onClick={() => alert('Mengunduh berkas terjemahan... (Simulasi)')}
-              className="flex items-center gap-1 rounded-lg bg-pink-600 text-white px-3 py-1.5 text-xs font-semibold hover:bg-pink-700 transition-colors shadow-md shadow-pink-600/10 cursor-pointer"
-            >
-              <Download className="h-3.5 w-3.5" />
-              <span>Unduh</span>
-            </button>
+            {activeReviewAssignment.resultFileUrl && (
+              <a
+                href={activeReviewAssignment.resultFileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 shrink-0 rounded-lg bg-pink-600 text-white px-3 py-1.5 text-xs font-bold hover:bg-pink-700 transition-colors shadow-md shadow-pink-600/10 cursor-pointer"
+              >
+                <span>Buka Dokumen</span>
+              </a>
+            )}
           </div>
 
           {/* Submission Notes */}

@@ -1,6 +1,5 @@
 import React from 'react';
 import { AppProvider, useApp } from './context/AppContext';
-import { Header } from './components/common/Header';
 import { Sidebar } from './components/common/Sidebar';
 
 // Admin Components
@@ -38,9 +37,9 @@ const MainLayout: React.FC = () => {
   // Dynamic browser tab title based on navigation in Indonesian
   React.useEffect(() => {
     const tabNames: Record<string, string> = {
-      dashboard: 'Pusat Kendali',
-      translators: 'Direktori Penerjemah',
-      assignments: 'Daftar Penugasan',
+      dashboard: 'Dashboard',
+      translators: 'Manajemen Penerjemah',
+      assignments: 'Daftar Tugas',
       timers: 'Pemantau Waktu',
       workload: 'Beban Kerja & Kapasitas',
       reports: 'Laporan Kinerja',
@@ -91,14 +90,16 @@ const MainLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 transition-colors font-sans antialiased flex flex-col">
-      <Header />
-      <div className="flex flex-1">
-        <Sidebar />
-        <main className="flex-1 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full overflow-x-hidden">
-          {currentRole === 'SUPER_ADMIN' ? renderAdminTab() : renderTranslatorTab()}
-        </main>
-      </div>
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 transition-colors font-sans antialiased flex">
+      <Sidebar />
+      <main className="flex-1 min-w-0 overflow-x-hidden">
+        {/* pt-14 on mobile = clear the fixed h-14 topbar; no padding on md+ */}
+        <div className="pt-14 md:pt-0">
+          <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full">
+            {currentRole === 'SUPER_ADMIN' ? renderAdminTab() : renderTranslatorTab()}
+          </div>
+        </div>
+      </main>
 
       {/* Modals & Drawers */}
       <NewAssignmentModal />

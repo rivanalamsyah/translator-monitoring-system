@@ -5,4 +5,4 @@
  *
  * Ubah nilai VITE_USE_FIREBASE di file .env.local untuk mengaktifkan.
  */
-export const USE_FIREBASE = import.meta.env.VITE_USE_FIREBASE === 'true';
+export const USE_FIREBASE = true;

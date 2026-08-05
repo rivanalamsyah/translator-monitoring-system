@@ -56,16 +56,81 @@ export const onAssignmentUpdate = onDocumentUpdated("assignments/{assignmentId}"
   const beforeData = change.before.data();
   const afterData = change.after.data();
 
-  // Handle status changes
+  const points = afterData.calculatedPoints || 0;
+
+  // Handle translator reassignment
+  if (beforeData.translatorId !== afterData.translatorId) {
+    const oldTranslatorId = beforeData.translatorId;
+    const newTranslatorId = afterData.translatorId;
+
+    if (oldTranslatorId) {
+      const oldProfileRef = db.collection("translator_profiles").doc(oldTranslatorId);
+      await db.runTransaction(async (transaction) => {
+        const profileDoc = await transaction.get(oldProfileRef);
+        if (profileDoc.exists) {
+          const profileData = profileDoc.data()!;
+          const maxCapacity = profileData.maxCapacityPoints || 20.0;
+          const currentLoad = Math.max(0, (profileData.currentLoadPoints || 0) - points);
+          const remainingCapacity = maxCapacity - currentLoad;
+          const utilization = Math.round((currentLoad / maxCapacity) * 100);
+          
+          transaction.update(oldProfileRef, {
+            currentLoadPoints: currentLoad,
+            remainingCapacityPoints: remainingCapacity,
+            utilizationPercentage: utilization,
+            activeAssignmentId: profileData.activeAssignmentId === change.before.id ? null : profileData.activeAssignmentId
+          });
+        }
+      });
+    }
+
+    if (newTranslatorId) {
+      const newProfileRef = db.collection("translator_profiles").doc(newTranslatorId);
+      await db.runTransaction(async (transaction) => {
+        const profileDoc = await transaction.get(newProfileRef);
+        if (profileDoc.exists) {
+          const profileData = profileDoc.data()!;
+          const maxCapacity = profileData.maxCapacityPoints || 20.0;
+          const currentLoad = (profileData.currentLoadPoints || 0) + points;
+          const remainingCapacity = maxCapacity - currentLoad;
+          const utilization = Math.round((currentLoad / maxCapacity) * 100);
+          
+          let newStatus = profileData.status || "READY";
+          if (afterData.status === "WORKING") newStatus = "WORKING";
+          else if (afterData.status === "PAUSED") newStatus = "PAUSED";
+          else if (afterData.status === "REVISION") newStatus = "REVISION";
+          else if (afterData.status === "ASSIGNED") newStatus = "ASSIGNED";
+
+          transaction.update(newProfileRef, {
+            status: newStatus,
+            currentLoadPoints: currentLoad,
+            remainingCapacityPoints: remainingCapacity,
+            utilizationPercentage: utilization,
+            activeAssignmentId: afterData.status === "WORKING" ? change.after.id : profileData.activeAssignmentId
+          });
+        }
+      });
+    }
+
+    // Add audit log for reassignment
+    await db.collection("audit_logs").add({
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      userId: "system",
+      action: "REASSIGN_ASSIGNMENT",
+      targetDocumentId: change.after.id,
+      details: `Assignment ${afterData.code} reassigned from translator ${beforeData.translatorName || "None"} to ${afterData.translatorName || "None"}`
+    });
+  }
+
+  // Handle status changes (when translator is the same)
   if (beforeData.status !== afterData.status) {
     const translatorId = afterData.translatorId;
 
-    if (translatorId) {
+    if (translatorId && beforeData.translatorId === afterData.translatorId) {
       const profileRef = db.collection("translator_profiles").doc(translatorId);
 
       // If status changed to COMPLETED
       if (afterData.status === "COMPLETED") {
-        const points = afterData.calculatedPoints || 0;
         await db.runTransaction(async (transaction) => {
           const profileDoc = await transaction.get(profileRef);
           if (!profileDoc.exists) return;
@@ -90,13 +155,17 @@ export const onAssignmentUpdate = onDocumentUpdated("assignments/{assignmentId}"
         await profileRef.update({ status: "PAUSED" });
       } else if (afterData.status === "WORKING") {
         await profileRef.update({ status: "WORKING" });
+      } else if (afterData.status === "ASSIGNED") {
+        await profileRef.update({ status: "ASSIGNED" });
+      } else if (afterData.status === "REVISION") {
+        await profileRef.update({ status: "REVISION" });
       }
     }
 
     // Add to audit logs
     await db.collection("audit_logs").add({
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      userId: "system", // Trigger functions act as system actor
+      userId: "system",
       action: "UPDATE_ASSIGNMENT_STATUS",
       targetDocumentId: change.after.id,
       details: `Assignment status changed from ${beforeData.status} to ${afterData.status}`
@@ -177,7 +246,7 @@ export const submitAssignmentCallable = onCall<SubmitPayload>(async (request) =>
   const adminDocs = await adminsQuery.get();
   const notificationPromises = adminDocs.docs.map((doc) => {
     return db.collection("notifications").add({
-      targetUserId: doc.id,
+      userId: doc.id,
       title: "New Translation Submitted 📄",
       message: `Translator ${auth.token.name || "Ahmad"} submitted document ${assignmentId}.`,
       type: "INFO",
@@ -217,7 +286,7 @@ export const deadlineCronJob = onSchedule("*/15 * * * *", async () => {
 
         // Send push notification
         await db.collection("notifications").add({
-          targetUserId: userId,
+          userId: userId,
           title: "Urgent Deadline Warning ⏰",
           message: `The deadline for document ${data.code} is in less than 2 hours.`,
           type: "ALERT",

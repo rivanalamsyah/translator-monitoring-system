@@ -12,15 +12,24 @@ import {
   UserProfile,
 } from '../types';
 import {
-  INITIAL_TRANSLATORS,
-  INITIAL_ASSIGNMENTS,
-  INITIAL_ACTIVITY_LOGS,
-  INITIAL_NOTIFICATIONS,
   INITIAL_SYSTEM_SETTINGS,
 } from '../data/initialData';
-import avatarMale from '../assets/avatar_male.png';
-import avatarFemale from '../assets/avatar_female.png';
-import { USE_FIREBASE } from '../lib/firebaseFlag';
+import {
+  fsCreateAssignment,
+  fsUpdateAssignment,
+  fsDeleteAssignment,
+  fsAddTranslator,
+  fsUpdateTranslator,
+  fsDeleteTranslator,
+  fsAddActivityLog,
+  fsAddNotification,
+  fsMarkNotificationRead,
+  fsClearNotifications,
+  fsAddTimerLog,
+  fsUpdateTimerLog,
+  fsUpdateSettings,
+  fsSubmitAssignmentCallable,
+} from '../services/firestoreService';
 
 interface AppContextType {
   // Navigation & Role
@@ -50,23 +59,23 @@ interface AppContextType {
   startAssignmentTimer: (assignmentId: string) => void;
   pauseAssignmentTimer: (assignmentId: string, reason: string) => void;
   resumeAssignmentTimer: (assignmentId: string) => void;
-  submitAssignment: (assignmentId: string, resultFileName: string, notes: string) => void;
+  submitAssignment: (assignmentId: string, resultFileUrl: string, notes: string) => void;
   approveAssignment: (assignmentId: string) => void;
   requestRevision: (assignmentId: string, notes: string) => void;
-  
+
   createAssignment: (newDoc: Partial<Assignment>) => void;
   updateAssignment: (id: string, updates: Partial<Assignment>) => void;
   deleteAssignment: (id: string) => void;
   reassignAssignment: (assignmentId: string, newTranslatorId: string) => void;
 
   addTranslator: (newTr: Partial<TranslatorProfile>) => void;
-  updateTranslator: (id: string, updates: Partial<TranslatorProfile>) => void;
+  updateTranslator: (id: string, updates: Partial<TranslatorProfile>, originalVersion?: number) => void;
   deleteTranslator: (id: string) => void;
 
   updateSettings: (newSettings: SystemSettings) => void;
   markNotificationRead: (id: string) => void;
   clearAllNotifications: () => void;
-  
+
   // Modals controller
   isNewAssignmentModalOpen: boolean;
   setIsNewAssignmentModalOpen: (open: boolean) => void;
@@ -88,33 +97,6 @@ interface AppContextType {
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
-
-const MASTER_USERS: UserProfile[] = [
-  {
-    id: 'u-admin',
-    name: 'Super Admin',
-    email: 'admin@translator.id',
-    role: 'SUPER_ADMIN',
-    avatar: avatarMale,
-    phone: '+62 812-0000-0000',
-  },
-  {
-    id: 'tr-1',
-    name: 'Ahmad Rizky',
-    email: 'ahmad.rizky@translator.id',
-    role: 'TRANSLATOR',
-    avatar: avatarMale,
-    phone: '+62 812-3456-7890',
-  },
-  {
-    id: 'tr-2',
-    name: 'Siti Rahma',
-    email: 'siti.rahma@translator.id',
-    role: 'TRANSLATOR',
-    avatar: avatarFemale,
-    phone: '+62 813-9876-5432',
-  }
-];
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   // Persistence key
@@ -145,25 +127,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [adminTab, setAdminTab] = useState<string>('dashboard');
   const [translatorTab, setTranslatorTab] = useState<string>('dashboard');
 
-
-
-
-  const [translators, setTranslators] = useState<TranslatorProfile[]>(
-    savedState?.translators || INITIAL_TRANSLATORS
-  );
-  const [assignments, setAssignments] = useState<Assignment[]>(
-    savedState?.assignments || INITIAL_ASSIGNMENTS
-  );
-  const [activityLogs, setActivityLogs] = useState<ActivityLogItem[]>(
-    savedState?.activityLogs || INITIAL_ACTIVITY_LOGS
-  );
-  const [notifications, setNotifications] = useState<SystemNotification[]>(
-    savedState?.notifications || INITIAL_NOTIFICATIONS
-  );
-  const [settings, setSettings] = useState<SystemSettings>(
-    savedState?.settings || INITIAL_SYSTEM_SETTINGS
-  );
-  const [timerLogs, setTimerLogs] = useState<TimerLog[]>(savedState?.timerLogs || []);
+  const [translators, setTranslators] = useState<TranslatorProfile[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [activityLogs, setActivityLogs] = useState<ActivityLogItem[]>([]);
+  const [notifications, setNotifications] = useState<SystemNotification[]>([]);
+  const [settings, setSettings] = useState<SystemSettings>(INITIAL_SYSTEM_SETTINGS);
+  const [timerLogs, setTimerLogs] = useState<TimerLog[]>([]);
 
   // Modals state
   const [isNewAssignmentModalOpen, setIsNewAssignmentModalOpen] = useState(false);
@@ -188,9 +157,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // ── Firebase Real-time Subscriptions (MODE: Firebase) ────────────────────
   useEffect(() => {
-    if (!USE_FIREBASE) return; // Skip jika mode localStorage
-
-    // Lazy-import services agar tidak dieksekusi saat mode localStorage
     let unsubFns: (() => void)[] = [];
 
     const initFirebase = async () => {
@@ -200,14 +166,24 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           subscribeAssignments,
           subscribeActivityLogs,
           subscribeSettings,
+          subscribeTimerLogs,
         } = await import('../services/firestoreService');
+
+        const isTranslator = currentUser?.role === 'TRANSLATOR';
+        const translatorIdFilter = isTranslator ? (currentUser?.id || activeTranslatorUserId) : undefined;
 
         unsubFns.push(
           subscribeTranslators((data) => setTranslators(data)),
-          subscribeAssignments((data) => setAssignments(data)),
-          subscribeActivityLogs((data) => setActivityLogs(data)),
+          subscribeAssignments(translatorIdFilter, (data) => setAssignments(data)),
           subscribeSettings((data) => setSettings(data)),
+          subscribeTimerLogs(translatorIdFilter, (data) => setTimerLogs(data))
         );
+
+        if (currentUser?.role === 'SUPER_ADMIN') {
+          unsubFns.push(
+            subscribeActivityLogs((data) => setActivityLogs(data))
+          );
+        }
 
         // Subscribe notifikasi hanya jika ada user aktif
         if (currentUser) {
@@ -229,63 +205,41 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return () => {
       unsubFns.forEach((unsub) => unsub());
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [USE_FIREBASE, currentUser?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id, currentUser?.role]);
 
-  // ── Firebase Login/Logout (Override saat USE_FIREBASE=true) ──────────────
-  const login = USE_FIREBASE
-    ? async (email: string, pass: string): Promise<boolean> => {
-        try {
-          const { loginWithFirebase } = await import('../services/authService');
-          const profile = await loginWithFirebase(email, pass);
-          if (profile) {
-            setCurrentUser(profile);
-            setCurrentRole(profile.role);
-            if (profile.role === 'TRANSLATOR') {
-              setActiveTranslatorUserId(profile.id);
-            }
-            return true;
-          }
-          return false;
-        } catch (err) {
-          console.error('[TMS] Firebase login error:', err);
-          return false;
+  // ── Firebase Login/Logout ──────────────────────
+  const login = async (email: string, pass: string): Promise<boolean> => {
+    try {
+      const { loginWithFirebase } = await import('../services/authService');
+      const profile = await loginWithFirebase(email, pass);
+      if (profile) {
+        setCurrentUser(profile);
+        setCurrentRole(profile.role);
+        if (profile.role === 'TRANSLATOR') {
+          setActiveTranslatorUserId(profile.id);
         }
+        return true;
       }
-    : (email: string, pass: string): boolean => {
-        if (pass !== 'password') return false;
-        const matched = MASTER_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase());
-        if (matched) {
-          setCurrentUser(matched);
-          setCurrentRole(matched.role);
-          if (matched.role === 'TRANSLATOR') {
-            setActiveTranslatorUserId(matched.id);
-          } else {
-            setActiveTranslatorUserId('u-admin');
-          }
-          return true;
-        }
-        return false;
-      };
+      return false;
+    } catch (err) {
+      console.error('[TMS] Firebase login error:', err);
+      return false;
+    }
+  };
 
-  const logout = USE_FIREBASE
-    ? async () => {
-        try {
-          const { logoutFromFirebase } = await import('../services/authService');
-          await logoutFromFirebase();
-        } catch (err) {
-          console.error('[TMS] Firebase logout error:', err);
-        } finally {
-          setCurrentUser(null);
-          setCurrentRole('SUPER_ADMIN');
-          setActiveTranslatorUserId('u-admin');
-        }
-      }
-    : () => {
-        setCurrentUser(null);
-        setCurrentRole('SUPER_ADMIN');
-        setActiveTranslatorUserId('u-admin');
-      };
+  const logout = async () => {
+    try {
+      const { logoutFromFirebase } = await import('../services/authService');
+      await logoutFromFirebase();
+    } catch (err) {
+      console.error('[TMS] Firebase logout error:', err);
+    } finally {
+      setCurrentUser(null);
+      setCurrentRole('SUPER_ADMIN');
+      setActiveTranslatorUserId('u-admin');
+    }
+  };
 
   // Persist state changes
   useEffect(() => {
@@ -296,12 +250,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           role: currentRole,
           activeTranslatorUserId,
           theme,
-          translators,
-          assignments,
-          activityLogs,
-          notifications,
-          settings,
-          timerLogs,
           currentUser,
         })
       );
@@ -312,19 +260,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     currentRole,
     activeTranslatorUserId,
     theme,
-    translators,
-    assignments,
-    activityLogs,
-    notifications,
-    settings,
-    timerLogs,
     currentUser,
   ]);
 
   // Current active translator profile
   const currentTranslatorProfile = translators.find(
     (t) => t.userId === activeTranslatorUserId || t.id === activeTranslatorUserId
-  ) || translators[0];
+  );
 
   // REALTIME TIMER TICK ENGINE
   useEffect(() => {
@@ -356,6 +298,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // RECALCULATE TRANSLATOR STATUS & WORKLOAD AUTOMATICALLY
   useEffect(() => {
+    if (USE_FIREBASE) return;
     setTranslators((prevTranslators) => {
       return prevTranslators.map((tr) => {
         // Find all non-completed assignments for this translator
@@ -413,10 +356,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       currentRole === 'SUPER_ADMIN'
         ? { id: 'admin-1', name: 'Super Admin', role: 'SUPER_ADMIN' as UserRole }
         : {
-            id: currentTranslatorProfile?.userId || 'u-1',
-            name: currentTranslatorProfile?.name || 'Translator',
-            role: 'TRANSLATOR' as UserRole,
-          };
+          id: currentTranslatorProfile?.userId || 'u-1',
+          name: currentTranslatorProfile?.name || 'Translator',
+          role: 'TRANSLATOR' as UserRole,
+        };
 
     const newLog: ActivityLogItem = {
       id: `act-${Date.now()}`,
@@ -455,7 +398,34 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // ACTION: Start Assignment Timer
-  const startAssignmentTimer = (assignmentId: string) => {
+  const startAssignmentTimer = async (assignmentId: string) => {
+    if (USE_FIREBASE) {
+      const doc = assignments.find((a) => a.id === assignmentId);
+      if (!doc) return;
+      const nowStr = new Date().toISOString();
+      await fsUpdateAssignment(assignmentId, {
+        status: 'WORKING',
+        startedAt: doc.startedAt || nowStr,
+      });
+      await fsAddActivityLog({
+        userId: currentUser?.role === 'SUPER_ADMIN' ? 'admin-1' : (currentTranslatorProfile?.userId || 'u-1'),
+        userName: currentUser?.role === 'SUPER_ADMIN' ? 'Super Admin' : (currentTranslatorProfile?.name || 'Translator'),
+        userRole: currentUser?.role === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : 'TRANSLATOR',
+        action: 'Memulai Pengukur Waktu',
+        details: `Memulai pengerjaan terjemahan untuk ${doc.code || assignmentId}`,
+        assignmentId,
+        assignmentTitle: doc.title,
+        type: 'TIMER',
+      });
+      await fsAddTimerLog({
+        assignmentId,
+        translatorId: doc.translatorId || '',
+        type: 'WORK',
+        durationSeconds: 0,
+      });
+      return;
+    }
+
     setAssignments((prev) =>
       prev.map((doc) => {
         if (doc.id === assignmentId) {
@@ -471,7 +441,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const doc = assignments.find((a) => a.id === assignmentId);
     logActivity('Memulai Pengukur Waktu', `Memulai pengerjaan terjemahan untuk ${doc?.code || assignmentId}`, 'TIMER', assignmentId, doc?.title);
-    
+
     // Add timer log
     setTimerLogs((prev) => [
       {
@@ -487,7 +457,40 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // ACTION: Pause Assignment Timer
-  const pauseAssignmentTimer = (assignmentId: string, reason: string) => {
+  const pauseAssignmentTimer = async (assignmentId: string, reason: string) => {
+    if (USE_FIREBASE) {
+      const doc = assignments.find((a) => a.id === assignmentId);
+      if (!doc) return;
+      const activeLog = timerLogs.find((log) => log.assignmentId === assignmentId && log.type === 'WORK' && !log.endTime);
+      const nowStr = new Date().toISOString();
+      if (activeLog) {
+        const duration = Math.max(0, Math.round((Date.now() - new Date(activeLog.startTime).getTime()) / 1000));
+        await fsUpdateTimerLog(activeLog.id, {
+          endTime: nowStr,
+          durationSeconds: duration,
+        });
+      }
+      await fsAddTimerLog({
+        assignmentId,
+        translatorId: doc.translatorId || '',
+        type: 'PAUSE',
+        durationSeconds: 0,
+        reason,
+      });
+      await fsUpdateAssignment(assignmentId, { status: 'PAUSED' });
+      await fsAddActivityLog({
+        userId: currentUser?.role === 'SUPER_ADMIN' ? 'admin-1' : (currentTranslatorProfile?.userId || 'u-1'),
+        userName: currentUser?.role === 'SUPER_ADMIN' ? 'Super Admin' : (currentTranslatorProfile?.name || 'Translator'),
+        userRole: currentUser?.role === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : 'TRANSLATOR',
+        action: 'Menangguhkan Pengukur Waktu',
+        details: `Menangguhkan pengukur waktu untuk ${doc.code}. Alasan: "${reason}"`,
+        assignmentId,
+        assignmentTitle: doc.title,
+        type: 'TIMER',
+      });
+      return;
+    }
+
     setAssignments((prev) =>
       prev.map((doc) => {
         if (doc.id === assignmentId) {
@@ -529,7 +532,39 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // ACTION: Resume Assignment Timer
-  const resumeAssignmentTimer = (assignmentId: string) => {
+  const resumeAssignmentTimer = async (assignmentId: string) => {
+    if (USE_FIREBASE) {
+      const doc = assignments.find((a) => a.id === assignmentId);
+      if (!doc) return;
+      const activeLog = timerLogs.find((log) => log.assignmentId === assignmentId && log.type === 'PAUSE' && !log.endTime);
+      const nowStr = new Date().toISOString();
+      if (activeLog) {
+        const duration = Math.max(0, Math.round((Date.now() - new Date(activeLog.startTime).getTime()) / 1000));
+        await fsUpdateTimerLog(activeLog.id, {
+          endTime: nowStr,
+          durationSeconds: duration,
+        });
+      }
+      await fsAddTimerLog({
+        assignmentId,
+        translatorId: doc.translatorId || '',
+        type: 'WORK',
+        durationSeconds: 0,
+      });
+      await fsUpdateAssignment(assignmentId, { status: 'WORKING' });
+      await fsAddActivityLog({
+        userId: currentUser?.role === 'SUPER_ADMIN' ? 'admin-1' : (currentTranslatorProfile?.userId || 'u-1'),
+        userName: currentUser?.role === 'SUPER_ADMIN' ? 'Super Admin' : (currentTranslatorProfile?.name || 'Translator'),
+        userRole: currentUser?.role === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : 'TRANSLATOR',
+        action: 'Melanjutkan Pengukur Waktu',
+        details: `Melanjutkan pengerjaan aktif untuk ${doc.code}`,
+        assignmentId,
+        assignmentTitle: doc.title,
+        type: 'TIMER',
+      });
+      return;
+    }
+
     setAssignments((prev) =>
       prev.map((doc) => {
         if (doc.id === assignmentId) {
@@ -570,15 +605,37 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // ACTION: Submit Assignment Work
-  const submitAssignment = (assignmentId: string, resultFileName: string, notes: string) => {
+  const submitAssignment = async (assignmentId: string, resultFileUrl: string, notes: string) => {
+    if (USE_FIREBASE) {
+      const doc = assignments.find((a) => a.id === assignmentId);
+      if (!doc) return;
+      await fsSubmitAssignmentCallable({
+        assignmentId,
+        resultFileName: 'Google Drive Link',
+        resultFileUrl,
+        submissionNotes: notes,
+      });
+      await fsAddActivityLog({
+        userId: currentUser?.role === 'SUPER_ADMIN' ? 'admin-1' : (currentTranslatorProfile?.userId || 'u-1'),
+        userName: currentUser?.role === 'SUPER_ADMIN' ? 'Super Admin' : (currentTranslatorProfile?.name || 'Translator'),
+        userRole: currentUser?.role === 'SUPER_ADMIN' ? 'SUPER_ADMIN' : 'TRANSLATOR',
+        action: 'Mengirimkan Terjemahan',
+        details: `Menyerahkan tautan hasil terjemahan Google Drive: ${resultFileUrl}. Menunggu tinjauan.`,
+        assignmentId,
+        assignmentTitle: doc.title,
+        type: 'SUBMISSION',
+      });
+      return;
+    }
+
     setAssignments((prev) =>
       prev.map((doc) => {
         if (doc.id === assignmentId) {
           return {
             ...doc,
             status: 'WAITING_REVIEW',
-            resultFileName,
-            resultFileUrl: '#',
+            resultFileName: 'Google Drive Link',
+            resultFileUrl,
             submissionNotes: notes,
             submittedAt: new Date().toISOString(),
           };
@@ -603,19 +660,49 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     );
 
     const doc = assignments.find((a) => a.id === assignmentId);
-    logActivity('Mengirimkan Terjemahan', `Mengunggah berkas selesai ${resultFileName}. Menunggu tinjauan.`, 'SUBMISSION', assignmentId, doc?.title);
+    logActivity('Mengirimkan Terjemahan', `Menyerahkan tautan hasil terjemahan Google Drive: ${resultFileUrl}. Menunggu tinjauan.`, 'SUBMISSION', assignmentId, doc?.title);
 
     addNotification(
       'ALL',
       'Terjemahan Dikirim untuk Ditinjau',
-      `${doc?.translatorName} telah mengirimkan terjemahan untuk ${doc?.code} - ${doc?.title}.`,
+      `${doc?.translatorName} telah mengirimkan terjemahan Google Drive untuk ${doc?.code} - ${doc?.title}.`,
       'INFO',
       assignmentId
     );
   };
 
   // ACTION: Approve Assignment
-  const approveAssignment = (assignmentId: string) => {
+  const approveAssignment = async (assignmentId: string) => {
+    if (USE_FIREBASE) {
+      const doc = assignments.find((a) => a.id === assignmentId);
+      if (!doc) return;
+      await fsUpdateAssignment(assignmentId, {
+        status: 'COMPLETED',
+        completedAt: new Date().toISOString(),
+      });
+      if (doc.translatorId) {
+        await fsAddNotification({
+          userId: doc.translatorId,
+          title: 'Terjemahan Disetujui! 🎉',
+          message: `Pengiriman tugas Anda untuk ${doc.code} telah disetujui oleh Super Admin.`,
+          type: 'SUCCESS',
+          assignmentId,
+          read: false,
+        });
+      }
+      await fsAddActivityLog({
+        userId: 'admin-1',
+        userName: 'Super Admin',
+        userRole: 'SUPER_ADMIN',
+        action: 'Menyetujui Hasil Terjemahan',
+        details: `Super Admin menyetujui penyelesaian untuk ${doc.code}.`,
+        assignmentId,
+        assignmentTitle: doc.title,
+        type: 'REVIEW',
+      });
+      return;
+    }
+
     const doc = assignments.find((a) => a.id === assignmentId);
     if (!doc) return;
 
@@ -650,7 +737,37 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // ACTION: Request Revision
-  const requestRevision = (assignmentId: string, notes: string) => {
+  const requestRevision = async (assignmentId: string, notes: string) => {
+    if (USE_FIREBASE) {
+      const doc = assignments.find((a) => a.id === assignmentId);
+      if (!doc) return;
+      await fsUpdateAssignment(assignmentId, {
+        status: 'REVISION',
+        revisionNotes: notes,
+      });
+      if (doc.translatorId) {
+        await fsAddNotification({
+          userId: doc.translatorId,
+          title: 'Permintaan Revisi',
+          message: `Super Admin meminta revisi untuk ${doc.code}. Catatan: ${notes}`,
+          type: 'ALERT',
+          assignmentId,
+          read: false,
+        });
+      }
+      await fsAddActivityLog({
+        userId: 'admin-1',
+        userName: 'Super Admin',
+        userRole: 'SUPER_ADMIN',
+        action: 'Meminta Revisi',
+        details: `Revisi diperlukan untuk ${doc.code}. Catatan: ${notes}`,
+        assignmentId,
+        assignmentTitle: doc.title,
+        type: 'REVIEW',
+      });
+      return;
+    }
+
     const doc = assignments.find((a) => a.id === assignmentId);
     if (!doc) return;
 
@@ -681,7 +798,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // CRUD Assignments
-  const createAssignment = (newDoc: Partial<Assignment>) => {
+  const createAssignment = async (newDoc: Partial<Assignment>) => {
     // VALIDATION: Check if translator is OFFLINE or ON_LEAVE
     if (newDoc.translatorId) {
       const targetTr = translators.find((t) => t.id === newDoc.translatorId);
@@ -691,12 +808,61 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
     }
 
-    const id = `doc-${Date.now()}`;
     const code = `DOC-2026-${Math.floor(100 + Math.random() * 900)}`;
-
     const pageCount = newDoc.pageCount || 10;
     const pointMultiplier = newDoc.pointMultiplier || 1.0;
     const calculatedPoints = parseFloat((pageCount * pointMultiplier).toFixed(1));
+
+    if (USE_FIREBASE) {
+      const assignmentData = {
+        code,
+        title: newDoc.title || 'Untitled Document',
+        clientName: newDoc.clientName || 'General Client',
+        documentType: newDoc.documentType || 'General',
+        pageCount,
+        languageFrom: newDoc.languageFrom || 'EN-ID',
+        languageTo: newDoc.languageTo || 'Indonesian',
+        pointMultiplier,
+        calculatedPoints,
+        translatorId: newDoc.translatorId || '',
+        translatorName: newDoc.translatorName || '',
+        status: newDoc.translatorId ? 'ASSIGNED' : 'UNASSIGNED',
+        priority: newDoc.priority || 'MEDIUM',
+        createdAt: new Date().toISOString(),
+        assignedAt: newDoc.translatorId ? new Date().toISOString() : undefined,
+        deadlineAt: newDoc.deadlineAt || new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+        estimatedMinutes: Math.round(pageCount * 25),
+        totalWorkingSeconds: 0,
+        totalIdleSeconds: 0,
+        sourceFileName: newDoc.sourceFileName || 'Document_Source.pdf',
+        sourceFileUrl: '#',
+        createdBy: 'Super Admin',
+      };
+      const id = await fsCreateAssignment(assignmentData as any);
+      await fsAddActivityLog({
+        userId: 'admin-1',
+        userName: 'Super Admin',
+        userRole: 'SUPER_ADMIN',
+        action: 'Membuat Penugasan',
+        details: `Menambahkan penugasan baru ${code} (${calculatedPoints} poin).`,
+        assignmentId: id,
+        assignmentTitle: assignmentData.title,
+        type: 'ASSIGNMENT',
+      });
+      if (newDoc.translatorId) {
+        await fsAddNotification({
+          userId: newDoc.translatorId,
+          title: 'Penugasan Baru Diberikan 📋',
+          message: `Anda telah ditugaskan untuk proyek ${code}: ${assignmentData.title}.`,
+          type: 'INFO',
+          assignmentId: id,
+          read: false,
+        });
+      }
+      return;
+    }
+
+    const id = `doc-${Date.now()}`;
 
     const assignment: Assignment = {
       id,
@@ -739,18 +905,44 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  const updateAssignment = (id: string, updates: Partial<Assignment>) => {
+  const updateAssignment = async (id: string, updates: Partial<Assignment>) => {
+    if (USE_FIREBASE) {
+      await fsUpdateAssignment(id, updates);
+      await fsAddActivityLog({
+        userId: 'admin-1',
+        userName: 'Super Admin',
+        userRole: 'SUPER_ADMIN',
+        action: 'Memperbarui Penugasan',
+        details: `Mengubah properti penugasan ${id}`,
+        type: 'ASSIGNMENT',
+      });
+      return;
+    }
+
     setAssignments((prev) => prev.map((a) => (a.id === id ? { ...a, ...updates } : a)));
     logActivity('Memperbarui Penugasan', `Mengubah properti penugasan ${id}`, 'ASSIGNMENT', id);
   };
 
-  const deleteAssignment = (id: string) => {
+  const deleteAssignment = async (id: string) => {
+    if (USE_FIREBASE) {
+      await fsDeleteAssignment(id);
+      await fsAddActivityLog({
+        userId: 'admin-1',
+        userName: 'Super Admin',
+        userRole: 'SUPER_ADMIN',
+        action: 'Menghapus Penugasan',
+        details: `Menghapus penugasan ${id}`,
+        type: 'ASSIGNMENT',
+      });
+      return;
+    }
+
     const doc = assignments.find((a) => a.id === id);
     setAssignments((prev) => prev.filter((a) => a.id !== id));
     logActivity('Menghapus Penugasan', `Menghapus penugasan ${doc?.code || id}`, 'ASSIGNMENT', id);
   };
 
-  const reassignAssignment = (assignmentId: string, newTranslatorId: string) => {
+  const reassignAssignment = async (assignmentId: string, newTranslatorId: string) => {
     const doc = assignments.find((a) => a.id === assignmentId);
     const newTr = translators.find((t) => t.id === newTranslatorId);
 
@@ -759,6 +951,34 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // VALIDATION: Check if translator is OFFLINE or ON_LEAVE
     if (newTr.status === 'OFFLINE' || newTr.status === 'ON_LEAVE') {
       alert(`Tidak dapat mengalihkan penugasan: Penerjemah ${newTr.name} saat ini sedang ${newTr.status === 'OFFLINE' ? 'Offline' : 'Cuti'}.`);
+      return;
+    }
+
+    if (USE_FIREBASE) {
+      await fsUpdateAssignment(assignmentId, {
+        translatorId: newTr.id,
+        translatorName: newTr.name,
+        status: 'ASSIGNED',
+        assignedAt: new Date().toISOString(),
+      });
+      await fsAddActivityLog({
+        userId: 'admin-1',
+        userName: 'Super Admin',
+        userRole: 'SUPER_ADMIN',
+        action: 'Mengalihkan Dokumen',
+        details: `Mengalihkan ${doc.code} kepada ${newTr.name}`,
+        assignmentId,
+        assignmentTitle: doc.title,
+        type: 'REASSIGN',
+      });
+      await fsAddNotification({
+        userId: newTr.id,
+        title: 'Dokumen Dialihkan kepada Anda',
+        message: `Anda ditugaskan untuk menangani ${doc.code} - ${doc.title}.`,
+        type: 'INFO',
+        assignmentId,
+        read: false,
+      });
       return;
     }
 
@@ -795,7 +1015,36 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   // CRUD Translators
-  const addTranslator = (newTr: Partial<TranslatorProfile>) => {
+  const addTranslator = async (newTr: Partial<TranslatorProfile>) => {
+    if (USE_FIREBASE) {
+      const userId = `u-${Date.now()}`;
+      const profileData = {
+        userId,
+        name: newTr.name || 'New Translator',
+        email: newTr.email || 'translator@domain.com',
+        phone: newTr.phone || '+62 812-0000-0000',
+        avatar: newTr.avatar || '',
+        languages: newTr.languages || ['EN-ID'],
+        maxCapacityPoints: newTr.maxCapacityPoints || 20,
+        currentLoadPoints: 0,
+        remainingCapacityPoints: newTr.maxCapacityPoints || 20,
+        utilizationPercentage: 0,
+        status: 'READY' as const,
+        completedJobsCount: 0,
+        rating: 5.0,
+      };
+      await fsAddTranslator(profileData);
+      await fsAddActivityLog({
+        userId: 'admin-1',
+        userName: 'Super Admin',
+        userRole: 'SUPER_ADMIN',
+        action: 'Menambahkan Penerjemah',
+        details: `Membuat profil penerjemah baru untuk ${profileData.name}`,
+        type: 'SYSTEM',
+      });
+      return;
+    }
+
     const id = `tr-${Date.now()}`;
     const userId = `u-${Date.now()}`;
 
@@ -820,27 +1069,161 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     logActivity('Menambahkan Penerjemah', `Membuat profil penerjemah baru untuk ${profile.name}`, 'SYSTEM');
   };
 
-  const updateTranslator = (id: string, updates: Partial<TranslatorProfile>) => {
-    setTranslators((prev) => prev.map((t) => (t.id === id ? { ...t, ...updates } : t)));
-    logActivity('Memperbarui Penerjemah', `Memperbarui profil penerjemah untuk ${id}`, 'SYSTEM');
+  const updateTranslator = async (id: string, updates: Partial<TranslatorProfile>, originalVersion?: number) => {
+    const tr = translators.find((t) => t.id === id);
+    if (!tr) return;
+
+    // 1. Validasi Akses
+    const isAdmin = currentRole === 'SUPER_ADMIN';
+    const isOwner = currentUser?.role === 'TRANSLATOR' && (currentUser?.id === tr.userId || currentUser?.id === tr.id);
+    if (!isAdmin && !isOwner) {
+      alert('Akses Ditolak: Anda tidak memiliki izin untuk mengubah profil ini.');
+      return;
+    }
+
+    // 2. Validasi Form
+    if (updates.name !== undefined && !updates.name.trim()) {
+      alert('Validasi Gagal: Nama lengkap tidak boleh kosong.');
+      return;
+    }
+    if (updates.email !== undefined) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(updates.email)) {
+        alert('Validasi Gagal: Format email tidak valid.');
+        return;
+      }
+    }
+    if (updates.phone !== undefined && !updates.phone.trim()) {
+      alert('Validasi Gagal: Nomor WhatsApp/telepon tidak boleh kosong.');
+      return;
+    }
+
+    // 3. Penanganan Konflik Konkurensi
+    if (originalVersion !== undefined && tr.version !== undefined && tr.version !== originalVersion) {
+      const confirmOverwrite = window.confirm(
+        `Konflik Terdeteksi!\nData profil ini telah diperbarui oleh pengguna lain (Versi ${tr.version}, Diperbarui: ${tr.updatedAt ? new Date(tr.updatedAt).toLocaleString() : 'N/A'}) sejak Anda membuka form edit.\n\nApakah Anda ingin menimpa perubahan tersebut?`
+      );
+      if (!confirmOverwrite) {
+        return;
+      }
+    }
+
+    // Increment versi & set updatedAt
+    const nextVersion = (tr.version || 1) + 1;
+    const nowStr = new Date().toISOString();
+    const finalUpdates = {
+      ...updates,
+      version: nextVersion,
+      updatedAt: nowStr,
+    };
+
+    // 4. Catatan Audit Log Perubahan Detail
+    const changes: string[] = [];
+    Object.keys(updates).forEach((k) => {
+      const key = k as keyof TranslatorProfile;
+      const oldValue = tr[key];
+      const newValue = updates[key];
+      if (newValue !== undefined && JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
+        changes.push(`${key}: "${oldValue}" -> "${newValue}"`);
+      }
+    });
+
+    const activeUser =
+      currentRole === 'SUPER_ADMIN'
+        ? { id: 'admin-1', name: 'Super Admin', role: 'SUPER_ADMIN' as UserRole }
+        : {
+          id: currentTranslatorProfile?.userId || 'u-1',
+          name: currentTranslatorProfile?.name || 'Translator',
+          role: 'TRANSLATOR' as UserRole,
+        };
+
+    const detailsText = changes.length > 0 ? changes.join(', ') : 'Tidak ada perubahan data';
+    const logDetails = `Mengubah profil penerjemah ${tr.name} (ID: ${id}). Perubahan: [${detailsText}]. Versi baru: ${nextVersion}`;
+
+    if (USE_FIREBASE) {
+      await fsUpdateTranslator(id, finalUpdates);
+      await fsAddActivityLog({
+        userId: activeUser.id,
+        userName: activeUser.name,
+        userRole: activeUser.role,
+        action: 'Memperbarui Profil Penerjemah',
+        details: logDetails,
+        type: 'SYSTEM',
+      });
+      return;
+    }
+
+    setTranslators((prev) => prev.map((t) => (t.id === id ? { ...t, ...finalUpdates } : t)));
+
+    // Log Activity (Local Mode)
+    const newLog: ActivityLogItem = {
+      id: `act-${Date.now()}`,
+      timestamp: nowStr,
+      userId: activeUser.id,
+      userName: activeUser.name,
+      userRole: activeUser.role,
+      action: 'Memperbarui Profil Penerjemah',
+      details: logDetails,
+      type: 'SYSTEM',
+    };
+    setActivityLogs((prev) => [newLog, ...prev]);
   };
 
-  const deleteTranslator = (id: string) => {
+  const deleteTranslator = async (id: string) => {
+    if (USE_FIREBASE) {
+      const tr = translators.find((t) => t.id === id);
+      await fsDeleteTranslator(id);
+      await fsAddActivityLog({
+        userId: 'admin-1',
+        userName: 'Super Admin',
+        userRole: 'SUPER_ADMIN',
+        action: 'Menghapus Penerjemah',
+        details: `Menghapus profil penerjemah ${tr?.name || id}`,
+        type: 'SYSTEM',
+      });
+      return;
+    }
+
     const tr = translators.find((t) => t.id === id);
     setTranslators((prev) => prev.filter((t) => t.id !== id));
     logActivity('Menghapus Penerjemah', `Menghapus profil penerjemah ${tr?.name || id}`, 'SYSTEM');
   };
 
-  const updateSettings = (newSettings: SystemSettings) => {
+  const updateSettings = async (newSettings: SystemSettings) => {
+    if (USE_FIREBASE) {
+      await fsUpdateSettings(newSettings);
+      await fsAddActivityLog({
+        userId: 'admin-1',
+        userName: 'Super Admin',
+        userRole: 'SUPER_ADMIN',
+        action: 'Memperbarui Pengaturan Sistem',
+        details: 'Memperbarui pengaturan sistem.',
+        type: 'SYSTEM',
+      });
+      return;
+    }
+
     setSettings(newSettings);
     logActivity('Memperbarui Pengaturan Sistem', 'Mengubah aturan bahasa dan ambang batas sistem.', 'SYSTEM');
   };
 
-  const markNotificationRead = (id: string) => {
+  const markNotificationRead = async (id: string) => {
+    if (USE_FIREBASE) {
+      await fsMarkNotificationRead(id);
+      return;
+    }
+
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
   };
 
-  const clearAllNotifications = () => {
+  const clearAllNotifications = async () => {
+    if (USE_FIREBASE) {
+      if (currentUser) {
+        await fsClearNotifications(currentUser.id);
+      }
+      return;
+    }
+
     setNotifications([]);
   };
 

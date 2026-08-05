@@ -74,8 +74,9 @@ service cloud.firestore {
     }
 
     match /notifications/{notifId} {
-      allow read: if isSuperAdmin() || isOwner(resource.data.targetUserId);
-      allow write: if isSuperAdmin();
+      allow read: if isSuperAdmin() || isOwner(resource.data.userId) || resource.data.userId == 'ALL';
+      allow create: if isSuperAdmin();
+      allow update, delete: if isSuperAdmin() || isOwner(resource.data.userId);
     }
 
     match /system_settings/{docId} {

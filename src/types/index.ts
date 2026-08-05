@@ -54,6 +54,14 @@ export interface TranslatorProfile {
   activeAssignmentId?: string;
   completedJobsCount: number;
   rating: number; // e.g. 4.9
+  address?: string;
+  certifications?: string[];
+  specialties?: string[];
+  paymentAccount?: string;
+  supportingDocuments?: string[];
+  availability?: string;
+  updatedAt?: string;
+  version?: number;
 }
 
 export interface Assignment {
