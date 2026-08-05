@@ -10,7 +10,7 @@
  *   npx tsx scripts/clearDatabase.ts
  */
 
-import * as admin from 'firebase-admin';
+import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore, Query } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
 import * as path from 'path';
@@ -37,7 +37,6 @@ if (!projectId) {
   process.exit(1);
 }
 
-// Inisialisasi Firebase Admin
 // Cek ketersediaan kredensial sebelum inisialisasi untuk menghindari crash asinkron
 const serviceAccountPath = path.join(process.cwd(), 'service-account.json');
 const hasServiceAccount = fs.existsSync(serviceAccountPath);
@@ -58,13 +57,13 @@ if (!hasServiceAccount && !hasGoogleCredsEnv && !hasEmulator) {
 if (hasServiceAccount) {
   console.log('🔑 Menggunakan service-account.json untuk autentikasi...');
   const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
+  initializeApp({
+    credential: cert(serviceAccount),
     projectId,
   });
 } else {
   console.log('ℹ️  Menggunakan Application Default Credentials / Emulator...');
-  admin.initializeApp({
+  initializeApp({
     projectId,
   });
 }

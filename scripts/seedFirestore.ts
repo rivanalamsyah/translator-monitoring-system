@@ -15,7 +15,7 @@
 
 // ─── PERINGATAN: Jalankan hanya sekali! Data akan ditimpa jika sudah ada. ───
 
-import * as admin from 'firebase-admin';
+import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -61,13 +61,13 @@ if (!hasServiceAccount && !hasGoogleCredsEnv && !hasEmulator) {
 if (hasServiceAccount) {
   console.log('🔑 Menggunakan service-account.json untuk autentikasi...');
   const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
+  initializeApp({
+    credential: cert(serviceAccount),
     projectId,
   });
 } else {
   console.log('ℹ️  Menggunakan Application Default Credentials / Emulator...');
-  admin.initializeApp({
+  initializeApp({
     projectId,
   });
 }
