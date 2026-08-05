@@ -11,7 +11,11 @@ service cloud.firestore {
     }
     
     function isSuperAdmin() {
-      return isAuthenticated() && request.auth.token.role == 'SUPER_ADMIN';
+      return isAuthenticated() && (
+        request.auth.token.role == 'SUPER_ADMIN' ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'SUPER_ADMIN')
+      );
     }
     
     function isOwner(userId) {
@@ -19,9 +23,11 @@ service cloud.firestore {
     }
     
     function isAssignedTranslator(translatorId) {
-      return isAuthenticated() && 
-             request.auth.token.role == 'TRANSLATOR' && 
-             request.auth.token.translatorProfileId == translatorId;
+      return isAuthenticated() && (
+        request.auth.uid == translatorId ||
+        (request.auth.token.role == 'TRANSLATOR' && 
+         request.auth.token.translatorProfileId == translatorId)
+      );
     }
 
     // ==========================================
@@ -65,7 +71,10 @@ service cloud.firestore {
 
     match /timer_logs/{logId} {
       allow read: if isSuperAdmin() || isAssignedTranslator(resource.data.translatorId);
-      allow create: if isAuthenticated() && request.resource.data.translatorId == request.auth.token.translatorProfileId;
+      allow create: if isAuthenticated() && (
+        request.resource.data.translatorId == request.auth.uid ||
+        request.resource.data.translatorId == request.auth.token.translatorProfileId
+      );
       allow update: if isSuperAdmin() || (
         isAssignedTranslator(resource.data.translatorId) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['endTime', 'durationSeconds', 'reason'])

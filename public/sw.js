@@ -6,7 +6,7 @@
  *  - External APIs/Firebase: Network-Only
  */
 
-const CACHE_VERSION = 'v1.0.0';
+const CACHE_VERSION = 'v1.0.1';
 const STATIC_CACHE = `tms-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `tms-dynamic-${CACHE_VERSION}`;
 const OFFLINE_URL = '/offline.html';
