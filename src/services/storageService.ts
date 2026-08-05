@@ -21,32 +21,37 @@ export async function uploadAvatar(
   translatorId: string,
   onProgress?: (progress: number) => void
 ): Promise<string> {
-  const storage = getFirebaseStorage();
-  const ext = file.name.split('.').pop() || 'jpg';
-  const filename = `${Date.now()}_avatar.${ext}`;
-  const storageRef = ref(storage, `avatars/${translatorId}/${filename}`);
+  try {
+    const storage = getFirebaseStorage();
+    const ext = file.name.split('.').pop() || 'jpg';
+    const filename = `${Date.now()}_avatar.${ext}`;
+    const storageRef = ref(storage, `avatars/${translatorId}/${filename}`);
 
-  return new Promise((resolve, reject) => {
-    const task = uploadBytesResumable(storageRef, file, {
-      contentType: file.type,
+    return new Promise((resolve, reject) => {
+      const task = uploadBytesResumable(storageRef, file, {
+        contentType: file.type,
+      });
+
+      task.on(
+        'state_changed',
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          onProgress?.(Math.round(progress));
+        },
+        (error) => {
+          console.warn('[TMS Storage] Firebase Storage error, falling back to base64:', error);
+          fileToDataUrl(file).then(resolve).catch(reject);
+        },
+        async () => {
+          const downloadUrl = await getDownloadURL(task.snapshot.ref);
+          resolve(downloadUrl);
+        }
+      );
     });
-
-    task.on(
-      'state_changed',
-      (snapshot) => {
-        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        onProgress?.(Math.round(progress));
-      },
-      (error) => {
-        console.error('[TMS Storage] Upload error:', error);
-        reject(error);
-      },
-      async () => {
-        const downloadUrl = await getDownloadURL(task.snapshot.ref);
-        resolve(downloadUrl);
-      }
-    );
-  });
+  } catch (err) {
+    console.warn('[TMS Storage] Firebase Storage not initialized, falling back to base64:', err);
+    return fileToDataUrl(file);
+  }
 }
 
 /**
