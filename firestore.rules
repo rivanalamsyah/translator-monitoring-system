@@ -13,6 +13,8 @@ service cloud.firestore {
     function isSuperAdmin() {
       return isAuthenticated() && (
         request.auth.token.role == 'SUPER_ADMIN' ||
+        request.auth.token.email == 'admin@mastertranslate.com' ||
+        request.auth.token.email == 'admin@translator.id' ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'SUPER_ADMIN')
       );
