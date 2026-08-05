@@ -15,6 +15,7 @@ service cloud.firestore {
         request.auth.token.role == 'SUPER_ADMIN' ||
         request.auth.token.email == 'admin@mastertranslate.com' ||
         request.auth.token.email == 'admin@translator.id' ||
+        request.auth.token.email == 'alamsyahrivan14@gmail.com' ||
         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'SUPER_ADMIN')
       );
@@ -28,7 +29,9 @@ service cloud.firestore {
       return isAuthenticated() && (
         request.auth.uid == translatorId ||
         (request.auth.token.role == 'TRANSLATOR' && 
-         request.auth.token.translatorProfileId == translatorId)
+         request.auth.token.translatorProfileId == translatorId) ||
+        (exists(/databases/$(database)/documents/translator_profiles/$(translatorId)) &&
+         get(/databases/$(database)/documents/translator_profiles/$(translatorId)).data.email == request.auth.token.email)
       );
     }
 
