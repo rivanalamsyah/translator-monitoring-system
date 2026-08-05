@@ -364,7 +364,7 @@ export const TranslatorProfileView: React.FC = () => {
                     type="text"
                     value={editPaymentAccount}
                     onChange={(e) => setEditPaymentAccount(e.target.value)}
-                    placeholder="contoh: Bank BCA 1234567890 a/n Ahmad Rizky"
+                    placeholder="contoh: Bank Mandiri 1234567890 a/n Nama Rekening"
                     className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-pink-500"
                   />
                 </div>

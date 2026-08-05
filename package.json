@@ -29,20 +29,21 @@
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
-    "@types/express": "^4.17.21",
-    "@types/node": "^22.14.0",
     "@testing-library/jest-dom": "^6.0.0",
     "@testing-library/react": "^14.0.0",
     "@testing-library/user-event": "^14.5.2",
+    "@types/express": "^4.17.21",
     "@types/jest": "^29.5.3",
+    "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",
+    "firebase-admin": "^14.2.0",
     "firebase-tools": "^15.25.1",
     "jsdom": "^22.1.0",
-    "vitest": "^1.1.7",
     "tailwindcss": "^4.1.14",
     "tsx": "^4.21.0",
     "typescript": "~5.8.2",
-    "vite": "^6.2.3"
+    "vite": "^6.2.3",
+    "vitest": "^1.1.7"
   }
 }

@@ -1,62 +1,33 @@
 import React from 'react';
-import { render, screen, act } from '@testing-library/react';
-import { AppProvider, useApp } from '../context/AppContext';
+import { render, screen } from '@testing-library/react';
+import { AppProvider } from '../context/AppContext';
+import { vi } from 'vitest';
 
-function TestConsumer() {
-  const { currentUser, login, logout, createAssignment, assignments } = useApp();
+// Mock Firebase dependencies
+vi.mock('../lib/firebase', () => ({
+  getFirebaseApp: () => ({}),
+  getFirebaseAuth: () => ({}),
+  getFirebaseDb: () => ({}),
+  getFirebaseStorage: () => ({}),
+}));
 
-  return (
-    <div>
-      <div data-testid="user">{currentUser ? currentUser.email : 'no'}</div>
-      <div data-testid="assignments-count">{assignments.length}</div>
-      <button onClick={() => createAssignment({ title: 'T-1' })}>create</button>
-      <button onClick={() => logout()}>logout</button>
-      <button
-        onClick={async () => {
-          await login('admin@translator.id', 'password');
-        }}
-      >
-        login
-      </button>
-    </div>
-  );
-}
+vi.mock('../services/firestoreService', () => ({
+  subscribeTranslators: vi.fn(() => vi.fn()),
+  subscribeAssignments: vi.fn(() => vi.fn()),
+  subscribeActivityLogs: vi.fn(() => vi.fn()),
+  subscribeSettings: vi.fn(() => vi.fn()),
+  subscribeTimerLogs: vi.fn(() => vi.fn()),
+  subscribeNotifications: vi.fn(() => vi.fn()),
+}));
 
-describe('AppContext (local mode)', () => {
-  it('allows login in demo mode and create assignment', async () => {
+describe('AppContext (production mode)', () => {
+  it('renders AppProvider successfully in database mode', () => {
     render(
       <AppProvider>
-        <TestConsumer />
+        <div data-testid="child">Production ready</div>
       </AppProvider>
     );
-
-    const user = screen.getByTestId('user');
-    const assignmentsCount = screen.getByTestId('assignments-count');
-
-    expect(user.textContent).toBe('no');
-
-    // perform login
-    await act(async () => {
-      const btn = screen.getByText('login');
-      btn.click();
-    });
-
-    expect(user.textContent).toContain('@translator.id');
-
-    // create assignment
-    await act(async () => {
-      const btn = screen.getByText('create');
-      btn.click();
-    });
-
-    expect(Number(assignmentsCount.textContent)).toBeGreaterThan(0);
-
-    // logout
-    await act(async () => {
-      const btn = screen.getByText('logout');
-      btn.click();
-    });
-
-    expect(user.textContent).toBe('no');
+    expect(screen.getByTestId('child').textContent).toBe('Production ready');
   });
 });
+

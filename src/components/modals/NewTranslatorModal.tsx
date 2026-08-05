@@ -21,12 +21,12 @@ export const NewTranslatorModal: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || !email.trim() || !phone.trim()) return;
 
     addTranslator({
-      name,
-      email: email || `${name.toLowerCase().replace(/\s+/g, '.')}@translator.id`,
-      phone: phone || '+62 812-0000-0000',
+      name: name.trim(),
+      email: email.trim(),
+      phone: phone.trim(),
       languages: selectedLanguages.length > 0 ? selectedLanguages : ['EN-ID'],
       maxCapacityPoints,
     });
@@ -73,10 +73,11 @@ export const NewTranslatorModal: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-4 text-slate-755">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-600">Alamat Email</label>
+              <label className="text-xs font-semibold text-slate-600">Alamat Email *</label>
               <input
                 type="email"
-                placeholder="maya@translator.id"
+                required
+                placeholder="penerjemah@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-850 placeholder-slate-400 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/50 transition-colors"
@@ -84,10 +85,11 @@ export const NewTranslatorModal: React.FC = () => {
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-600">Nomor Telepon</label>
+              <label className="text-xs font-semibold text-slate-600">Nomor Telepon *</label>
               <input
                 type="text"
-                placeholder="+62 812-1122-3344"
+                required
+                placeholder="+62 8xx-xxxx-xxxx"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-850 placeholder-slate-400 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/50 transition-colors"

@@ -3,7 +3,6 @@ import { useState, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react';
 import logoImg from '../../assets/logo.png';
-import { USE_FIREBASE } from '../../lib/firebaseFlag';
 
 export function Login() {
   const { login } = useApp();
@@ -115,7 +114,7 @@ export function Login() {
                 disabled={loading}
                 value={email}
                 onChange={(e: any) => setEmail(e.target.value)}
-                placeholder="admin@translator.id"
+                placeholder="nama@email.com"
                 className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-sm text-slate-800 placeholder-slate-400 transition focus:border-pink-500 focus:ring-2 focus:ring-pink-500/20 focus:outline-none disabled:cursor-not-allowed disabled:opacity-70"
               />
             </div>
@@ -168,34 +167,6 @@ export function Login() {
             )}
           </button>
         </form>
-
-        {!USE_FIREBASE && (
-          <div className="border-t border-slate-100 pt-4 text-center">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              Kredensial Demo
-            </p>
-
-            <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3 font-mono text-[10px] text-slate-600">
-              <div>
-                Admin:{' '}
-                <span className="font-semibold text-pink-600">
-                  admin@translator.id
-                </span>
-              </div>
-
-              <div className="mt-1">
-                Penerjemah:{' '}
-                <span className="font-semibold text-pink-600">
-                  ahmad.rizky@translator.id
-                </span>
-              </div>
-
-              <div className="mt-2 border-t border-slate-200 pt-2 text-center text-[9px] text-slate-400">
-                Kata sandi seluruh akun demo: <strong>password</strong>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

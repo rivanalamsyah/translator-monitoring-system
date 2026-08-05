@@ -16,13 +16,17 @@
 // ─── PERINGATAN: Jalankan hanya sekali! Data akan ditimpa jika sudah ada. ───
 
 import * as admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
 import * as path from 'path';
 import * as fs from 'fs';
 
-// Load env dari .env.local
+// Load env dari .env.local jika ada, fallback ke .env
 const envFile = path.join(process.cwd(), '.env.local');
-if (fs.existsSync(envFile)) {
-  const lines = fs.readFileSync(envFile, 'utf-8').split('\n');
+const fallbackEnvFile = path.join(process.cwd(), '.env');
+const targetEnv = fs.existsSync(envFile) ? envFile : fallbackEnvFile;
+
+if (fs.existsSync(targetEnv)) {
+  const lines = fs.readFileSync(targetEnv, 'utf-8').split('\n');
   lines.forEach((line) => {
     const [key, ...vals] = line.split('=');
     if (key && !key.startsWith('#')) {
@@ -33,117 +37,44 @@ if (fs.existsSync(envFile)) {
 
 const projectId = process.env.VITE_FIREBASE_PROJECT_ID;
 if (!projectId) {
-  console.error('❌ VITE_FIREBASE_PROJECT_ID tidak ditemukan di .env.local');
+  console.error('❌ VITE_FIREBASE_PROJECT_ID tidak ditemukan di environment (.env atau .env.local).');
   process.exit(1);
 }
 
-// Inisialisasi dengan Application Default Credentials (gcloud auth login)
-admin.initializeApp({
-  projectId,
-});
+// Cek ketersediaan kredensial sebelum inisialisasi untuk menghindari crash asinkron
+const serviceAccountPath = path.join(process.cwd(), 'service-account.json');
+const hasServiceAccount = fs.existsSync(serviceAccountPath);
+const hasGoogleCredsEnv = !!process.env.GOOGLE_APPLICATION_CREDENTIALS;
+const hasEmulator = !!process.env.FIRESTORE_EMULATOR_HOST;
 
-const db = admin.firestore();
+if (!hasServiceAccount && !hasGoogleCredsEnv && !hasEmulator) {
+  console.error('\n❌ Kredensial Firebase Admin SDK tidak ditemukan!');
+  console.error('\nTips Perbaikan untuk Menjalankan Script Database Seeding:');
+  console.error('1. Unduh file Kunci Akun Layanan (Service Account Key JSON) dari Firebase Console > Project Settings > Service Accounts.');
+  console.error('2. Simpan file tersebut di folder root proyek ini dengan nama "service-account.json".');
+  console.error('3. Pastikan "service-account.json" sudah terdaftar di .gitignore agar tidak terunggah ke repositori.');
+  console.error('4. Jalankan kembali script ini.');
+  process.exit(1);
+}
+
+// Inisialisasi Firebase Admin
+if (hasServiceAccount) {
+  console.log('🔑 Menggunakan service-account.json untuk autentikasi...');
+  const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+    projectId,
+  });
+} else {
+  console.log('ℹ️  Menggunakan Application Default Credentials / Emulator...');
+  admin.initializeApp({
+    projectId,
+  });
+}
+
+const db = getFirestore();
 
 // ─── Data Seed ───────────────────────────────────────────────────────────────
-
-const TRANSLATORS = [
-  {
-    id: 'tr-1',
-    userId: 'tr-1',
-    name: 'Ahmad Rizky',
-    email: 'ahmad.rizky@translator.id',
-    phone: '+62 812-3456-7890',
-    avatarUrl: '',
-    languages: ['EN-ID', 'ID-EN'],
-    maxCapacityPoints: 20,
-    currentLoadPoints: 0,
-    remainingCapacityPoints: 20,
-    utilizationPercentage: 0,
-    status: 'READY',
-    completedJobsCount: 48,
-    rating: 4.95,
-  },
-  {
-    id: 'tr-2',
-    userId: 'tr-2',
-    name: 'Siti Rahma',
-    email: 'siti.rahma@translator.id',
-    phone: '+62 813-9876-5432',
-    avatarUrl: '',
-    languages: ['JP-ID', 'AR-ID', 'EN-ID'],
-    maxCapacityPoints: 18,
-    currentLoadPoints: 0,
-    remainingCapacityPoints: 18,
-    utilizationPercentage: 0,
-    status: 'READY',
-    completedJobsCount: 62,
-    rating: 4.90,
-  },
-  {
-    id: 'tr-3',
-    userId: 'tr-3',
-    name: 'Budi Santoso',
-    email: 'budi.santoso@translator.id',
-    phone: '+62 811-2233-4455',
-    avatarUrl: '',
-    languages: ['ZH-ID', 'EN-ID'],
-    maxCapacityPoints: 25,
-    currentLoadPoints: 0,
-    remainingCapacityPoints: 25,
-    utilizationPercentage: 0,
-    status: 'READY',
-    completedJobsCount: 35,
-    rating: 4.85,
-  },
-  {
-    id: 'tr-4',
-    userId: 'tr-4',
-    name: 'Elena Rostova',
-    email: 'elena.rostova@translator.id',
-    phone: '+62 815-6677-8899',
-    avatarUrl: '',
-    languages: ['RU-ID', 'EN-ID'],
-    maxCapacityPoints: 20,
-    currentLoadPoints: 0,
-    remainingCapacityPoints: 20,
-    utilizationPercentage: 0,
-    status: 'READY',
-    completedJobsCount: 29,
-    rating: 4.88,
-  },
-  {
-    id: 'tr-5',
-    userId: 'tr-5',
-    name: 'Dewi Lestari',
-    email: 'dewi.lestari@translator.id',
-    phone: '+62 817-1122-3344',
-    avatarUrl: '',
-    languages: ['DE-ID', 'FR-ID'],
-    maxCapacityPoints: 15,
-    currentLoadPoints: 0,
-    remainingCapacityPoints: 15,
-    utilizationPercentage: 0,
-    status: 'READY',
-    completedJobsCount: 41,
-    rating: 4.78,
-  },
-  {
-    id: 'tr-6',
-    userId: 'tr-6',
-    name: 'Kaito Tanaka',
-    email: 'kaito.tanaka@translator.id',
-    phone: '+62 818-4455-6677',
-    avatarUrl: '',
-    languages: ['JP-ID', 'EN-ID'],
-    maxCapacityPoints: 20,
-    currentLoadPoints: 0,
-    remainingCapacityPoints: 20,
-    utilizationPercentage: 0,
-    status: 'ON_LEAVE',
-    completedJobsCount: 53,
-    rating: 4.92,
-  },
-];
 
 const SYSTEM_SETTINGS = {
   autoAssignEnabled: true,
@@ -165,18 +96,6 @@ const SYSTEM_SETTINGS = {
 
 // ─── Seed Functions ───────────────────────────────────────────────────────────
 
-async function seedTranslators() {
-  console.log('📋 Seeding translator_profiles...');
-  const batch = db.batch();
-  for (const t of TRANSLATORS) {
-    const { id, ...data } = t;
-    const ref = db.collection('translator_profiles').doc(id);
-    batch.set(ref, { ...data, createdAt: admin.firestore.FieldValue.serverTimestamp() });
-  }
-  await batch.commit();
-  console.log(`  ✅ ${TRANSLATORS.length} penerjemah di-seed.`);
-}
-
 async function seedSystemSettings() {
   console.log('⚙️  Seeding system_settings...');
   await db.collection('system_settings').doc('main').set(SYSTEM_SETTINGS);
@@ -194,7 +113,6 @@ async function main() {
   console.log('🚀 Memulai Firestore Seed untuk project:', projectId);
   console.log('══════════════════════════════════════════════');
 
-  await seedTranslators();
   await seedSystemSettings();
   await seedAdminUser();
 

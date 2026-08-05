@@ -8,17 +8,7 @@
 import React, { useRef, useState } from 'react';
 import { Upload, X, Camera, Loader } from 'lucide-react';
 import { AvatarImage } from './AvatarImage';
-import { USE_FIREBASE } from '../../lib/firebaseFlag';
 
-/** Konversi File ke Data URL (untuk mode localStorage) */
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
 
 interface AvatarUploadProps {
   /** Avatar URL saat ini */
@@ -72,14 +62,12 @@ export const AvatarUpload: React.FC<AvatarUploadProps> = ({
     try {
       let newUrl: string;
 
-      if (USE_FIREBASE && translatorId) {
+      if (translatorId) {
         // Mode Firebase: upload ke Storage
         const { uploadAvatar } = await import('../../services/storageService');
         newUrl = await uploadAvatar(file, translatorId, (p) => setUploadProgress(p));
       } else {
-        // Mode localStorage: konversi ke Data URL
-        newUrl = await fileToDataUrl(file);
-        setUploadProgress(100);
+        throw new Error('ID Penerjemah tidak ditemukan.');
       }
 
       setPreview(newUrl);
