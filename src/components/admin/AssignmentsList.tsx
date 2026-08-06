@@ -20,7 +20,6 @@ export const AssignmentsList: React.FC = () => {
     assignments,
     translators,
     deleteAssignment,
-    reassignAssignment,
     setIsNewAssignmentModalOpen,
     setActiveReviewAssignment,
     confirmAction,
@@ -31,7 +30,6 @@ export const AssignmentsList: React.FC = () => {
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
-  const [reassigningDocId, setReassigningDocId] = useState<string | null>(null);
 
   const filteredAssignments = useMemo(() => {
     return assignments.filter((a) => {

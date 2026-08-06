@@ -650,6 +650,11 @@ export async function fsUpdateClaimableTask(id: string, updates: Partial<Claimab
   await updateDoc(doc(db, 'claimable_tasks', id), updates);
 }
 
+export async function fsDeleteClaimableTask(id: string): Promise<void> {
+  const db = getFirebaseDb();
+  await deleteDoc(doc(db, 'claimable_tasks', id));
+}
+
 export async function fsAddRewardPointHistory(history: Omit<RewardPointHistory, 'id'>): Promise<string> {
   const db = getFirebaseDb();
   const docRef = await addDoc(collection(db, 'reward_point_history'), {

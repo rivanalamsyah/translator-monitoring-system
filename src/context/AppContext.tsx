@@ -21,6 +21,7 @@ import {
   fsCreateAssignment,
   fsUpdateAssignment,
   fsDeleteAssignment,
+  fsDeleteClaimableTask,
   fsAddTranslator,
   fsUpdateTranslator,
   fsDeleteTranslator,
@@ -96,7 +97,6 @@ interface AppContextType {
   createAssignment: (newDoc: Partial<Assignment>) => void;
   updateAssignment: (id: string, updates: Partial<Assignment>) => void;
   deleteAssignment: (id: string) => void;
-  reassignAssignment: (assignmentId: string, newTranslatorId: string) => void;
 
   addTranslator: (newTr: Partial<TranslatorProfile>) => void;
   updateTranslator: (id: string, updates: Partial<TranslatorProfile>, originalVersion?: number) => void;
@@ -965,7 +965,7 @@ successMessage: `Tugas "${doc.title}" disetujui dan dinyatakan selesai.`,
   };
 
   const updateAssignment = async (id: string, updates: Partial<Assignment>) => {
-    await fsUpdateAssignment(id, updates);
+    await fsUpdateClaimableTask(id, updates as any);
     await fsAddActivityLog({
       userId: 'admin-1',
       userName: 'Admin',
@@ -986,7 +986,7 @@ successMessage: `Tugas "${doc.title}" disetujui dan dinyatakan selesai.`,
       successTitle: 'Penugasan Dihapus',
       successMessage: `Tugas "${doc?.title || id}" berhasil dihapus dari sistem.`,
       onConfirm: async () => {
-        await fsDeleteAssignment(id);
+        await fsDeleteClaimableTask(id);
         await fsAddActivityLog({
           userId: 'admin-1',
           userName: 'Admin',
@@ -994,57 +994,6 @@ successMessage: `Tugas "${doc.title}" disetujui dan dinyatakan selesai.`,
           action: 'Menghapus Penugasan',
           details: `Menghapus penugasan ${id}`,
           type: 'ASSIGNMENT',
-        });
-      }
-    });
-  };
-
-  const reassignAssignment = async (assignmentId: string, newTranslatorId: string) => {
-    const doc = assignments.find((a) => a.id === assignmentId);
-    const newTr = translators.find((t) => t.id === newTranslatorId);
-
-    if (!doc || !newTr) return;
-
-    // VALIDATION: Check if translator is OFFLINE or ON_LEAVE
-    if (newTr.status === 'OFFLINE' || newTr.status === 'ON_LEAVE') {
-      showError(
-        'Gagal Mengalihkan',
-        `Tidak dapat mengalihkan penugasan: Penerjemah ${newTr.name} saat ini sedang ${newTr.status === 'OFFLINE' ? 'Offline' : 'Cuti'}.`
-      );
-      return;
-    }
-
-    confirmAction({
-      title: 'Alihkan Penugasan?',
-      message: `Apakah Anda yakin ingin mengalihkan dokumen "${doc.title}" kepada ${newTr.name}?`,
-      type: 'warning',
-      confirmText: 'Alihkan',
-      successTitle: 'Berhasil Dialihkan',
-      successMessage: `Tugas "${doc.title}" berhasil dialihkan kepada ${newTr.name}.`,
-      onConfirm: async () => {
-        await fsUpdateAssignment(assignmentId, {
-          translatorId: newTr.id,
-          translatorName: newTr.name,
-          status: 'ASSIGNED',
-          assignedAt: new Date().toISOString(),
-        });
-        await fsAddActivityLog({
-          userId: 'admin-1',
-          userName: 'Admin',
-          userRole: 'ADMIN',
-          action: 'Mengalihkan Dokumen',
-          details: `Mengalihkan ${doc.code} kepada ${newTr.name}`,
-          assignmentId,
-          assignmentTitle: doc.title,
-          type: 'REASSIGN',
-        });
-        await fsAddNotification({
-          userId: newTr.id,
-          title: 'Dokumen Dialihkan kepada Anda',
-          message: `Anda ditugaskan untuk menangani ${doc.code} - ${doc.title}.`,
-          type: 'INFO',
-          assignmentId,
-          read: false,
         });
       }
     });
@@ -1491,7 +1440,6 @@ successMessage: `Tugas "${doc.title}" disetujui dan dinyatakan selesai.`,
         createAssignment,
         updateAssignment,
         deleteAssignment,
-        reassignAssignment,
 
         addTranslator,
         updateTranslator,
