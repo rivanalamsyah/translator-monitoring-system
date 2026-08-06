@@ -4,225 +4,141 @@ Sistem Monitoring Penerjemah (TMS) adalah aplikasi web modern single-page (SPA) 
 
 Aplikasi ini mendukung dua mode operasi:
 1. **Mode Lokal (Default):** Menggunakan `localStorage` browser untuk menyimpan data (ideal untuk demonstrasi, evaluasi, dan pengembangan cepat tanpa konfigurasi eksternal).
-2. **Mode Firebase (Production):** Menggunakan infrastruktur backend serverless dari Firebase (Authentication, Firestore, Cloud Storage, Hosting, dan Cloud Functions) untuk lingkungan produksi yang aman, real-time, dan terskala.
+2. **Mode Firebase (Production):** Menggunakan infrastruktur backend serverless dari Firebase (Authentication, Firestore, Hosting) untuk lingkungan produksi yang aman, real-time, dan terskala.
 
 ---
 
-## Fitur Utama
+## Desain & Antarmuka (Design System)
 
-- **Manajemen Profil Penerjemah:** Memantau kapasitas beban kerja maksimal, beban kerja aktif, persentase utilisasi, performa rating, dan status ketersediaan penerjemah secara dinamis.
-- **Manajemen Penugasan (Assignment Lifecycle):** Alur lengkap mulai dari pembuatan tugas (`UNASSIGNED`/`ASSIGNED`), pengerjaan (`WORKING`/`PAUSED`), pengiriman hasil (`WAITING_REVIEW`), revisi (`REVISION`), hingga penyelesaian (`COMPLETED`).
-- **Pelacakan Waktu Nyata (Live Time Tracking):** Timer bawaan yang menghitung waktu kerja (`totalWorkingSeconds`) dan waktu jeda (`totalIdleSeconds`) per tugas, lengkap dengan riwayat log timer (`timer_logs`).
-- **Notifikasi Sistem:** Notifikasi real-time untuk memberi tahu penerjemah ketika ada tugas baru atau revisi, serta memberi tahu admin saat hasil terjemahan telah diunggah.
-- **Audit & Activity Logs:** Pencatatan log aktivitas pengguna secara instan untuk transparansi operasional.
-- **Triggers Cloud Functions:** Otomatisasi sinkronisasi data kapasitas penerjemah saat tugas dibuat, diubah, dibatalkan, atau dialihkan (reassigned), serta pengiriman notifikasi otomatis mendekati batas waktu pengerjaan (deadline).
+- **Tema Warna:** *Blush Workspace* (Clean, minimalis, perpaduan warna pink-white dengan kontras abu-abu lembut).
+- **Sistem Ikon:** Konsisten menggunakan **Lucide Icons** dengan gaya outline (18–20 px pada tombol/menu, 24–32 px pada card statistik).
+- **Aturan UI/UX:** Bebas dari emoji di seluruh antarmuka (termasuk dashboard, leaderboard, badge, status, notifikasi, tombol, maupun kartu statistik) untuk menjaga kesan bisnis yang profesional.
+- **Responsivitas:** Mendukung tampilan Desktop (dengan sidebar yang dapat diciutkan) dan Mobile (dengan Bottom Navigation modern dan profesional).
 
 ---
 
-## Hasil Audit & Perbaikan (Changelog Perbaikan)
+## Akun Demo & Kredensial
 
-Sebagai hasil audit profesional yang komprehensif, beberapa perbaikan penting telah diimplementasikan demi menjamin kestabilan dan keamanan aplikasi pada tingkat produksi:
+Gunakan akun berikut untuk melakukan uji coba sistem (baik untuk login di emulators maupun Firebase Production):
 
-1. **Perbaikan Sinkronisasi State ke Firestore (TMS Core Sync):**
-   * **Masalah:** Sebelumnya, ketika mode Firebase aktif (`VITE_USE_FIREBASE=true`), tombol kontrol timer (start, pause, resume) dan pengiriman form hanya memperbarui state React lokal di memory. Data perubahan tidak pernah ditulis ke Firestore, sehingga seketika terhapus ketika snapshot Firestore baru datang.
-   * **Solusi:** Memperbarui semua fungsi aksi mutasi di `AppContext.tsx` untuk menulis langsung ke Firestore (`fsUpdateAssignment`, `fsAddTimerLog`, `fsAddActivityLog`, dll.). Data lokal kini otomatis tersinkronisasi berkat listener real-time dari Firestore (`onSnapshot`).
-2. **Pencegahan Error Keamanan (Permission Denied):**
-   * **Masalah:** Sesuai aturan keamanan `firestore.rules`, akun penerjemah dilarang membaca logs audit dan tugas milik penerjemah lain. Ketika penerjemah melakukan login, query tanpa filter memicu error fatal "Permission Denied" dari Firestore SDK.
-   * **Solusi:** Menambahkan filter pencarian berbasis `translatorId` pada subscription `subscribeAssignments` dan `subscribeTimerLogs` ketika user ber-role `TRANSLATOR` masuk. Serta membatasi subscription `subscribeActivityLogs` khusus untuk `SUPER_ADMIN`.
-3. **Penyelarasan Skema Notifikasi:**
-   * **Masalah:** Terjadi perbedaan penamaan field penerima notifikasi antara frontend (`userId`) dengan Cloud Functions dan rules database (`targetUserId`).
-   * **Solusi:** Menyatukan skema menggunakan field `userId` di semua platform (frontend, Cloud Functions, dan `firestore.rules`). Serta mengizinkan pengguna menghapus/memperbarui notifikasinya sendiri (untuk fitur "Clear All" dan "Mark as Read").
-4. **Penanganan Reassignment di Cloud Functions:**
-   * **Masalah:** Fungsi trigger `onAssignmentUpdate` sebelumnya hanya mendeteksi perubahan status pengerjaan, namun tidak menyesuaikan kapasitas utilisasi jika admin mengalihkan tugas (reassign) ke penerjemah lain.
-   * **Solusi:** Memperbarui trigger fungsi di Cloud Functions untuk mendeteksi perubahan `translatorId`. Secara otomatis, poin beban kerja tugas akan dikurangi dari penerjemah lama dan ditambahkan ke penerjemah baru melalui Firestore Transaction.
-5. **Koreksi Dependensi Terkorup di `package.json`:**
-   * **Masalah:** `@testing-library/user-event` disetel pada versi yang tidak ada (`^14.8.0`), menyebabkan install npm gagal.
-   * **Solusi:** Menurunkan dan mengunci versi ke `^14.5.2` yang stabil, dan berhasil menyelesaikan instalasi dengan `--legacy-peer-deps`.
-6. **Penambahan Konfigurasi Firebase Hosting & Isolasi TypeScript:**
-   * **Masalah:** Konfigurasi hosting tidak tersedia di `firebase.json` dan compiler TypeScript fungsi (`functions/tsc`) bentrok dengan tipe React root.
-   * **Solusi:** Menambahkan konfigurasi hosting SPA di `firebase.json` dan menambahkan `typeRoots` di `functions/tsconfig.json` untuk mengisolasi lingkungan typings.
+### 1. Akun Super Admin (Akses Penuh)
+- **Nama:** Administrator
+- **Role:** `super_admin` (Admin Panel dengan 6 Menu)
+- **Email:** `admin@example.com`
+- **Password:** `Admin@2026Secure!`
+
+### 2. Akun Translator (Ruang Kerja Penerjemah)
+- **Role:** `translator` (Translator Panel dengan 4 Menu)
+- **Status Awal:** `FREE` (Siap Menerima Tugas)
+- **Password:** `Translator@2026!` (Berlaku untuk semua translator)
+- **Email Akun:**
+  - Andi Pratama: `andi.pratama@example.com`
+  - Putri Maharani: `putri.maharani@example.co` (Domain `.co`)
+  - Rina Lestari: `rina.lestari@example.com`
+  - Fajar Nugroho: `fajar.nugroho@example.com`
+  - Dewi Anggraini: `dewi.anggraini@example.com`
 
 ---
 
-## Panduan Langkah demi Langkah Implementasi Firebase
+## Menu Dashboard
 
-Ikuti panduan berikut untuk menghubungkan dan mendeploy aplikasi ke Firebase Anda:
+### Dashboard Admin (6 Menu)
+1. **Dashboard** (`LayoutDashboard`): Ringkasan status operasional penerjemah dan aktivitas penugasan secara *real-time*.
+2. **Tugas** (`ClipboardList`): Mengelola pembuatan tugas baru dan alokasi penerjemah.
+3. **Penerjemah** (`Users`): Daftar profil penerjemah aktif dan metrik kapasitas beban kerja.
+4. **Leaderboard** (`Trophy`): Peringkat pencapaian poin pengerjaan penerjemah.
+5. **Laporan** (`BarChart3`): Analisis kinerja, SLA, dan visualisasi distribusi tugas.
+6. **Pengaturan** (`Settings`): Aturan poin per halaman, status auto-assign, dan preferensi notifikasi.
 
-### Langkah 1: Persiapan Project di Firebase Console
-1. Buka [Firebase Console](https://console.firebase.google.com/) dan buat proyek baru (misal: `translator-monitoring-system`).
-2. Aktifkan layanan berikut:
-   - **Authentication:** Masuk ke menu Build > Authentication > Get Started. Aktifkan metode login **Email/Password**.
-   - **Cloud Firestore:** Masuk ke Build > Firestore Database > Create Database. Pilih lokasi server database terdekat dan mulailah dalam **Production Mode**.
-   - **Storage:** Masuk ke Build > Storage > Get Started. Pilih mode default untuk bucket penyimpanan foto profil/avatar.
-   - **Cloud Functions:** Masuk ke Build > Functions (Memerlukan upgrade proyek ke paket pay-as-you-go **Blaze**, namun memiliki kuota gratis bulanan yang melimpah).
+### Dashboard Translator (4 Menu)
+1. **Dashboard** (`LayoutDashboard`): Monitor tugas aktif pengerjaan saat ini dengan kontrol start, pause, resume, dan submit.
+2. **Tugas** (`ClipboardList`): Pool Task yang tersedia untuk diklaim (*Task Claiming System*).
+3. **Leaderboard** (`Trophy`): Papan skor performa dan tingkatan badge pencapaian.
+4. **Profil** (`UserCircle`): Detail kontak, sertifikasi, kemampuan bahasa, dan sisa kapasitas beban kerja.
 
-### Langkah 2: Setup Kredensial Environment Lokal
-1. Buat aplikasi Web di Firebase Console (Project Settings > General > Add App > Web App).
-2. Salin objek konfigurasi Firebase SDK yang diberikan.
-3. Buat file baru bernama `.env.local` di root direktori proyek ini (salin dari `.env` atau `.env.local.example`):
-   ```env
-   # Firebase SDK Config
-   VITE_FIREBASE_API_KEY=AIzaSyAxxx...
-   VITE_FIREBASE_AUTH_DOMAIN=project-id.firebaseapp.com
-   VITE_FIREBASE_PROJECT_ID=project-id
-   VITE_FIREBASE_STORAGE_BUCKET=project-id.appspot.com
-   VITE_FIREBASE_MESSAGING_SENDER_ID=1234567890
-   VITE_FIREBASE_APP_ID=1:1234567890:web:abcdef123456
+---
 
-   # Aktifkan Integrasi Firebase
-   VITE_USE_FIREBASE=true
-   ```
+## Struktur Proyek & Analisis File
 
-### Langkah 3: Setup Firebase CLI & Inisialisasi
-1. Pastikan Anda memiliki Firebase Tools CLI terinstal secara global:
-   ```bash
-   npm install -g firebase-tools
-   ```
-2. Login ke akun Google Firebase Anda lewat terminal:
-   ```bash
-   firebase login
-   ```
-3. Hubungkan proyek lokal dengan proyek Firebase di cloud:
-   ```bash
-   firebase use --add <nama-project-id-firebase-anda>
-   ```
+Berikut adalah file inti yang digunakan dalam sistem (file mati/tidak digunakan telah dihapus):
 
-### Langkah 4: Seeding Database Awal
-Kami menyediakan script otomatis untuk mengisi database Firestore Anda dengan data awal (profil penerjemah dan aturan poin halaman):
-1. Unduh kunci akun layanan (Service Account Key JSON) dari Firebase Console > Project Settings > Service Accounts.
-2. Atur kredensial aplikasi default Google di komputer Anda menggunakan Google Cloud CLI, ATAU jalankan perintah seed langsung:
+```text
+├── public/
+│   ├── assets/               # Aset statis favicon dan logo utama
+│   ├── icons/                # Ikon manifest untuk PWA
+│   └── offline.html          # Halaman fallback offline PWA
+├── scripts/
+│   ├── seedFirestore.ts     # Script pengisi data awal Firestore (Idempotent)
+│   └── setCustomClaims.ts   # Script utility pengatur custom claims pengguna Auth
+├── src/
+│   ├── assets/               # Aset gambar lokal (logo, avatar fallback)
+│   ├── components/
+│   │   ├── admin/           # Menu operasional Admin (Dashboard, List, Laporan)
+│   │   ├── common/          # Sidebar, BottomNav, CustomDialog, Badge, Leaderboard
+│   │   ├── modals/          # Modal input data baru dan formulir pengerjaan
+│   │   └── translator/      # Menu operasional Penerjemah (Dashboard, Profile)
+│   ├── context/
+│   │   └── AppContext.tsx   # Pengelola State Utama & Sinkronisasi Firestore
+│   ├── services/
+│   │   ├── authService.ts   # Login/Logout Auth Firebase
+│   │   └── firestoreService.ts # Real-time Listeners & Aksi Mutasi Firestore
+│   ├── lib/
+│   │   ├── firebase.ts      # Inisialisasi Firebase Web SDK
+│   │   └── firebaseFlag.ts  # Konfigurasi mode operasi (Lokal vs Firebase)
+│   ├── types/
+│   │   └── index.ts         # Definisi Interface TypeScript
+│   └── utils/
+│       └── formatters.ts    # Pemformat durasi, waktu, mata uang, dan status
+├── firestore.rules          # Aturan Keamanan Database Firestore (RBAC)
+├── firebase.json            # Konfigurasi Firebase Hosting & Firestore Rules
+└── firestore.indexes.json   # Composite Indexes untuk query Firestore
+```
+
+---
+
+## Langkah Instalasi & Pengoperasian Lokal
+
+### 1. Kloning dan Instalasi
+Pastikan Node.js terinstal di perangkat Anda, kemudian jalankan:
+```bash
+# Install dependency dengan mengabaikan konflik peer dependency React 18/19 pada pustaka tes
+npm install --legacy-peer-deps
+```
+
+### 2. Jalankan Mode Pengembangan (Local Storage)
+Secara default, `VITE_USE_FIREBASE=false` dapat disetel pada file `.env` untuk menjalankan simulasi database lokal menggunakan `localStorage` browser:
+```bash
+npm run dev
+```
+Akses aplikasi melalui browser di `http://localhost:3000`.
+
+### 3. Jalankan Mode Firebase (Production)
+Untuk menggunakan backend Firebase, setel environment variables di `.env.local`:
+```env
+VITE_FIREBASE_API_KEY=AIzaSy...
+VITE_FIREBASE_AUTH_DOMAIN=master-translator-monitoring.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=master-translator-monitoring
+VITE_FIREBASE_STORAGE_BUCKET=master-translator-monitoring.firebasestorage.app
+VITE_FIREBASE_MESSAGING_SENDER_ID=765738883690
+VITE_FIREBASE_APP_ID=1:765738883690:web:d6eba0a6a59e3bf5814813
+
+VITE_USE_FIREBASE=true
+```
+
+#### Menjalankan Script Database Seeder:
+1. Unduh file **Kunci Akun Layanan (Service Account Key JSON)** dari Firebase Console proyek Anda (**Project Settings > Service Accounts**).
+2. Simpan file tersebut di folder root proyek ini dengan nama `service-account.json`.
+3. Jalankan perintah seeder untuk membuat akun pertama:
    ```bash
    npx tsx scripts/seedFirestore.ts
    ```
-   *Catatan: Pastikan environment Firebase di `.env.local` sudah terisi lengkap sebelum menjalankan seeder.*
-
-### Langkah 5: Membuat Akun Pengguna & Menyematkan Claims Role
-Agar aturan keamanan database berjalan, setiap pengguna Firebase Auth harus memiliki custom claims `role` (`SUPER_ADMIN` atau `TRANSLATOR`).
-1. Buat user baru di menu **Firebase Console > Authentication > Users > Add User**.
-   * Contoh Admin: `admin@translator.id`
-   * Contoh Penerjemah: `ahmad.rizky@translator.id`
-2. Jalankan script claim helper yang telah kami sediakan untuk mendaftarkan role mereka:
-   ```bash
-   # Untuk Admin:
-   npx tsx scripts/setCustomClaims.ts admin@translator.id SUPER_ADMIN
-
-   # Untuk Penerjemah (Hubungkan dengan ID profile penerjemah di Firestore, misal tr-1):
-   npx tsx scripts/setCustomClaims.ts ahmad.rizky@translator.id TRANSLATOR tr-1
-   ```
-
-### Langkah 6: Pengujian Lokal dengan Firebase Emulator (Sangat Direkomendasikan)
-Gunakan emulator untuk memverifikasi keamanan aturan database secara lokal sebelum deploy ke server produksi:
-1. Pastikan Java JRE/JDK sudah terinstal di komputer Anda.
-2. Jalankan emulator lokal:
-   ```bash
-   npm run emulators:start
-   ```
 
 ---
 
-## Panduan Deployment ke Production
+## Kompilasi Produksi (Production Build)
 
-Setelah pengujian lokal berhasil, deploy seluruh aset dan aturan ke Firebase Cloud:
-
-### 1. Deploy Aturan & Indeks Firestore & Storage
-Deploy konfigurasi security rules dan composite index:
+Kompilasi kode frontend menjadi bundle statis yang dioptimalkan beserta Service Worker PWA:
 ```bash
-firebase deploy --only firestore,storage
-```
-
-### 2. Deploy Cloud Functions
-Masuk ke folder functions, instal dependensi, kompilasi TypeScript, dan deploy fungsi backend:
-```bash
-cd functions
-npm install
 npm run build
-cd ..
-firebase deploy --only functions
 ```
-
-### 3. Build & Deploy Frontend (Firebase Hosting)
-Kompilasi kode React frontend dan unggah file statis ke Hosting:
-```bash
-# Build frontend
-npm run build
-
-# Deploy Hosting
-firebase deploy --only hosting
-```
-Setelah deploy selesai, Firebase CLI akan menampilkan URL situs web produksi Anda (misal: `https://project-id.web.app`).
-
----
-
-## Struktur Proyek
-
-```text
-├── .github/workflows/       # Workflow CI/CD otomatis (GitHub Actions)
-├── assets/                  # Aset statis media utama
-├── dist/                    # Output build produksi frontend (dibuat saat build)
-├── functions/               # Backend Serverless Cloud Functions (Node.js + TS)
-│   ├── src/index.ts         # Logika utama trigger & Callable Functions
-│   └── tsconfig.json        # Isolasi compiler TypeScript functions
-├── scripts/
-│   ├── seedFirestore.ts     # Script pengisi data awal Firestore
-│   └── setCustomClaims.ts   # Script utility pengatur role pengguna Auth
-├── src/                     # Aplikasi Frontend React (TypeScript)
-│   ├── components/          # Komponen UI (Admin, Translator, Common)
-│   ├── context/
-│   │   └── AppContext.tsx   # Pengelola State Global & Pengendali Aksi
-│   ├── services/
-│   │   ├── authService.ts   # Integrasi Auth & Login/Logout Firebase
-│   │   ├── firestoreService.ts # Akses CRUD & Subscription Real-time
-│   │   └── storageService.ts   # Upload file media ke Cloud Storage
-│   ├── lib/
-│   │   ├── firebase.ts      # Lazy-initializer Firebase SDK
-│   │   └── firebaseFlag.ts  # Switcher Mode (Lokal vs Firebase)
-│   └── index.css            # Styling utama Tailwind CSS
-├── firestore.rules          # Aturan Keamanan Database Firestore
-├── storage.rules            # Aturan Keamanan Bucket Storage
-├── firebase.json            # File Utama Konfigurasi Layanan Firebase
-└── firestore.indexes.json   # Definisi Index Komposit untuk Query Terfilter
-```
-
----
-
-## Pengujian & Verifikasi Kualitas Kode
-
-Proyek ini dilengkapi dengan unit testing menggunakan **Vitest** dan **Testing Library**:
-- **Menjalankan Tes Unit:**
-  ```bash
-  npm run test
-  ```
-- **Menjalankan Linter / Compiler Check:**
-  ```bash
-  npm run lint
-  ```
-- **Melacak Cakupan Kode (Coverage):**
-  ```bash
-  npm run ci
-  ```
-
----
-
-## Pemeliharaan & Operasional Produksi
-
-- **Backup Rutin:** Jadwalkan ekspor data Firestore otomatis ke Cloud Storage menggunakan Cloud Scheduler dan Cloud Functions untuk mengantisipasi kehilangan data.
-- **Monitoring Error:** Aktifkan Google Cloud Logging untuk memantau logs Cloud Functions dan performa SLA dari Cron Job deadline (`deadlineCronJob`).
-- **Offboarding Penerjemah:** Saat menghapus penerjemah, pastikan untuk menonaktifkan akun mereka di Firebase Authentication dan mengubah status profil mereka ke `OFFLINE` untuk mencegah alokasi penugasan baru.
-
-
-Langkah 1: Buat Akun di Firebase Authentication
-Pertama, kita harus mendaftarkan email dan password untuk masuk ke aplikasi.
-
-Buka Firebase Console > Authentication.
-Pastikan Anda berada di tab Users.
-Klik tombol Add User (Tambah pengguna) di sebelah kanan.
-Buat akun pertama (Admin):
-Masukkan Email: admin@mastertranslate.com (atau email pilihan Anda).
-Masukkan Password: PasswordAdmin123! (atau password pilihan Anda).
-Klik Add user.
-PENTING: Setelah dibuat, salin (copy) kode acak yang ada di kolom User UID milik akun admin tersebut (misal: abc123xyz...). Simpan kode ini untuk Langkah 2.
-Klik Add User sekali lagi untuk membuat akun kedua (Penerjemah):
-Masukkan Email: translator@mastertranslate.com.
-Masukkan Password: PasswordTranslator123!.
-Klik Add user.
-PENTING: Salin kode User UID milik akun penerjemah tersebut. Simpan kode ini untuk Langkah 2.
+Hasil build akan tersimpan di folder `dist/` dan siap dideploy ke Firebase Hosting.
