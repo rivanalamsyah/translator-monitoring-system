@@ -48,6 +48,22 @@
         { "fieldPath": "translatorId", "order": "ASCENDING" },
         { "fieldPath": "startTime", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "claimable_tasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "claimable_tasks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "claimedById", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

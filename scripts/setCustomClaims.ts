@@ -3,14 +3,15 @@
  * TMS - Sistem Monitoring Penerjemah by Master Translate
  *
  * Jalankan script ini untuk menyetel role dan translatorProfileId pada Firebase Authentication user:
- *   npx tsx scripts/setCustomClaims.ts <email> <SUPER_ADMIN|TRANSLATOR> [translatorProfileId]
+ *   npx tsx scripts/setCustomClaims.ts <email> <ADMIN|PENERJEMAH> [translatorProfileId]
  *
  * Contoh:
- *   npx tsx scripts/setCustomClaims.ts admin@translator.id SUPER_ADMIN
- *   npx tsx scripts/setCustomClaims.ts ahmad.rizky@translator.id TRANSLATOR tr-1
+ *   npx tsx scripts/setCustomClaims.ts admin@translator.id ADMIN
+ *   npx tsx scripts/setCustomClaims.ts ahmad.rizky@translator.id PENERJEMAH tr-1
  */
 
-import * as admin from 'firebase-admin';
+import { initializeApp } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -36,7 +37,7 @@ if (!projectId) {
 }
 
 // Inisialisasi Firebase Admin
-admin.initializeApp({
+initializeApp({
   projectId,
 });
 
@@ -46,24 +47,25 @@ async function main() {
 
   if (!email || !role) {
     console.log('❌ Argumen tidak valid!');
-    console.log('   Penggunaan: npx tsx scripts/setCustomClaims.ts <email> <SUPER_ADMIN|TRANSLATOR> [translatorProfileId]');
+    console.log('   Penggunaan: npx tsx scripts/setCustomClaims.ts <email> <ADMIN|PENERJEMAH> [translatorProfileId]');
     process.exit(1);
   }
 
-  if (role !== 'SUPER_ADMIN' && role !== 'TRANSLATOR') {
-    console.error('❌ Role harus berupa SUPER_ADMIN atau TRANSLATOR.');
+  if (role !== 'ADMIN' && role !== 'PENERJEMAH') {
+    console.error('❌ Role harus berupa ADMIN atau PENERJEMAH.');
     process.exit(1);
   }
 
-  if (role === 'TRANSLATOR' && !translatorProfileId) {
-    console.error('❌ Role TRANSLATOR membutuhkan translatorProfileId (misal: tr-1).');
+  if (role === 'PENERJEMAH' && !translatorProfileId) {
+    console.error('❌ Role PENERJEMAH membutuhkan translatorProfileId (misal: tr-1).');
     process.exit(1);
   }
 
   console.log(`🔍 Mencari user dengan email: ${email}...`);
   
   try {
-    const userRecord = await admin.auth().getUserByEmail(email);
+    const auth = getAuth();
+    const userRecord = await auth.getUserByEmail(email);
     const uid = userRecord.uid;
     console.log(`✅ User ditemukan. UID: ${uid}`);
 
@@ -73,11 +75,11 @@ async function main() {
     }
 
     console.log(`⚙️  Menyetel custom claims:`, claims);
-    await admin.auth().setCustomUserClaims(uid, claims);
+    await auth.setCustomUserClaims(uid, claims);
     console.log(`🎉 Berhasil menyetel custom claims untuk user ${email}!`);
     
     // Verifikasi claims terbaru
-    const updatedUser = await admin.auth().getUser(uid);
+    const updatedUser = await auth.getUser(uid);
     console.log(`📝 Claims saat ini:`, updatedUser.customClaims);
     
     process.exit(0);

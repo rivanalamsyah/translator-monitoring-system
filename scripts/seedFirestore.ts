@@ -1,22 +1,14 @@
 /**
- * Firestore Seeder Script
+ * Firestore & Auth Seeder Script
  * Sistem Monitoring Penerjemah by Master Translate
  *
- * Jalankan sekali untuk seed data awal ke Firestore:
+ * Jalankan sekali untuk seed data awal ke Firestore & Auth:
  *   npx tsx scripts/seedFirestore.ts
- *
- * Prasyarat:
- * 1. File .env.local sudah dikonfigurasi dengan VITE_FIREBASE_* yang benar
- * 2. Firebase Admin SDK service account key tersedia (atau gunakan emulator)
- *
- * Catatan: Script ini menggunakan Firebase Admin SDK (server-side).
- * Install dulu: npm install firebase-admin --save-dev
  */
-
-// ─── PERINGATAN: Jalankan hanya sekali! Data akan ditimpa jika sudah ada. ───
 
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -41,7 +33,7 @@ if (!projectId) {
   process.exit(1);
 }
 
-// Cek ketersediaan kredensial sebelum inisialisasi untuk menghindari crash asinkron
+// Cek ketersediaan kredensial
 const serviceAccountPath = path.join(process.cwd(), 'service-account.json');
 const hasServiceAccount = fs.existsSync(serviceAccountPath);
 const hasGoogleCredsEnv = !!process.env.GOOGLE_APPLICATION_CREDENTIALS;
@@ -73,6 +65,7 @@ if (hasServiceAccount) {
 }
 
 const db = getFirestore();
+const auth = getAuth();
 
 // ─── Data Seed ───────────────────────────────────────────────────────────────
 
@@ -94,38 +87,143 @@ const SYSTEM_SETTINGS = {
   ],
 };
 
-// ─── Seed Functions ───────────────────────────────────────────────────────────
+const USERS_TO_SEED = [
+  {
+    name: 'Administrator',
+    email: 'admin@example.com',
+    password: 'Admin@2026Secure!',
+    role: 'super_admin',
+    customClaimRole: 'ADMIN',
+  },
+  {
+    name: 'Andi Pratama',
+    email: 'andi.pratama@example.com',
+    password: 'Translator@2026!',
+    role: 'translator',
+    customClaimRole: 'PENERJEMAH',
+  },
+  {
+    name: 'Putri Maharani',
+    email: 'putri.maharani@example.co',
+    password: 'Translator@2026!',
+    role: 'translator',
+    customClaimRole: 'PENERJEMAH',
+  },
+  {
+    name: 'Rina Lestari',
+    email: 'rina.lestari@example.com',
+    password: 'Translator@2026!',
+    role: 'translator',
+    customClaimRole: 'PENERJEMAH',
+  },
+  {
+    name: 'Fajar Nugroho',
+    email: 'fajar.nugroho@example.com',
+    password: 'Translator@2026!',
+    role: 'translator',
+    customClaimRole: 'PENERJEMAH',
+  },
+  {
+    name: 'Dewi Anggraini',
+    email: 'dewi.anggraini@example.com',
+    password: 'Translator@2026!',
+    role: 'translator',
+    customClaimRole: 'PENERJEMAH',
+  },
+];
 
-async function seedSystemSettings() {
+async function seedDatabase() {
+  // Check if users collection is empty
+  const usersSnapshot = await db.collection('users').limit(1).get();
+  if (!usersSnapshot.empty) {
+    console.log('ℹ️  Koleksi "users" sudah terisi. Seeder dilewati untuk menjaga idempotensi.');
+    return;
+  }
+
   console.log('⚙️  Seeding system_settings...');
   await db.collection('system_settings').doc('main').set(SYSTEM_SETTINGS);
   console.log('  ✅ System settings di-seed.');
-}
 
-async function seedAdminUser() {
-  console.log('👤 Catatan: Buat user admin di Firebase Console > Authentication > Add User');
-  console.log('   Email: admin@translator.id | Role: SUPER_ADMIN');
-  console.log('   Setelah dibuat, tambahkan custom claim di Cloud Functions atau Firebase Admin:');
-  console.log('   admin.auth().setCustomUserClaims(uid, { role: "SUPER_ADMIN" })');
+  for (const userData of USERS_TO_SEED) {
+    console.log(`👤 Mendaftarkan user: ${userData.name} (${userData.email})...`);
+    let userRecord;
+    try {
+      // Check if user already exists in Auth
+      userRecord = await auth.getUserByEmail(userData.email);
+      console.log(`  ℹ️  User Auth sudah terdaftar (UID: ${userRecord.uid}).`);
+    } catch (err: any) {
+      if (err.code === 'auth/user-not-found') {
+        // Create auth user (hashes password in Firebase Auth)
+        userRecord = await auth.createUser({
+          email: userData.email,
+          password: userData.password,
+          displayName: userData.name,
+        });
+        console.log(`  ✅ User Auth berhasil dibuat (UID: ${userRecord.uid}).`);
+      } else {
+        throw err;
+      }
+    }
+
+    const uid = userRecord.uid;
+
+    // Set custom claim roles matching firestore rules needs (ADMIN/PENERJEMAH)
+    const claims: Record<string, any> = { role: userData.customClaimRole };
+    if (userData.role === 'translator') {
+      claims.translatorProfileId = uid;
+    }
+    await auth.setCustomUserClaims(uid, claims);
+    console.log(`  ✅ Custom claims disetel: role = ${userData.customClaimRole}`);
+
+    // Create user document in Firestore (uses exact RBAC roles: super_admin / translator)
+    await db.collection('users').doc(uid).set({
+      uid,
+      name: userData.name,
+      email: userData.email,
+      role: userData.role,
+      isActive: true,
+      createdAt: new Date().toISOString(),
+    });
+    console.log(`  ✅ User document disimpan di Firestore (role: ${userData.role}).`);
+
+    // For translators, also provision /translator_profiles document
+    if (userData.role === 'translator') {
+      await db.collection('translator_profiles').doc(uid).set({
+        userId: uid,
+        name: userData.name,
+        email: userData.email,
+        phone: '+62 812-0000-0000',
+        avatar: '',
+        languages: ['EN-ID', 'ID-EN'],
+        maxCapacityPoints: 20,
+        currentLoadPoints: 0,
+        remainingCapacityPoints: 20,
+        utilizationPercentage: 0,
+        status: 'FREE',
+        completedJobsCount: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        version: 1,
+      });
+      console.log('  ✅ Translator profile document disimpan di Firestore (status: FREE).');
+    }
+  }
 }
 
 async function main() {
-  console.log('🚀 Memulai Firestore Seed untuk project:', projectId);
+  console.log('🚀 Memulai Firestore & Auth Seeder...');
+  console.log('Project ID:', projectId);
   console.log('══════════════════════════════════════════════');
 
-  await seedSystemSettings();
-  await seedAdminUser();
-
-  console.log('══════════════════════════════════════════════');
-  console.log('✅ Seed selesai! Data siap di Firestore.');
-  console.log('🔑 Langkah selanjutnya:');
-  console.log('   1. Buat user di Firebase Authentication');
-  console.log('   2. Set VITE_USE_FIREBASE=true di .env.local');
-  console.log('   3. Restart dev server: npm run dev');
+  try {
+    await seedDatabase();
+    console.log('══════════════════════════════════════════════');
+    console.log('🎉 Seeder selesai dengan sukses!');
+  } catch (err) {
+    console.error('❌ Gagal menjalankan seeder:', err);
+    process.exit(1);
+  }
   process.exit(0);
 }
 
-main().catch((err) => {
-  console.error('❌ Seed error:', err);
-  process.exit(1);
-});
+main();

@@ -1,113 +1,169 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
     // ==========================================
     // HELPER FUNCTIONS
     // ==========================================
-    
+
     function isAuthenticated() {
       return request.auth != null;
     }
-    
-    function isSuperAdmin() {
-      return isAuthenticated() && (
-        request.auth.token.role == 'SUPER_ADMIN' ||
-        request.auth.token.email == 'admin@mastertranslate.com' ||
-        request.auth.token.email == 'admin@translator.id' ||
-        request.auth.token.email == 'alamsyahrivan14@gmail.com' ||
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'SUPER_ADMIN')
-      );
+
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.role == 'ADMIN';
     }
-    
+
+    function isPenerjemah() {
+      return isAuthenticated() && request.auth.token.role == 'PENERJEMAH';
+    }
+
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
-    
+
+    function isOwnProfile(profileId) {
+      return isAuthenticated() && (
+        request.auth.uid == profileId ||
+        request.auth.token.translatorProfileId == profileId
+      );
+    }
+
     function isAssignedTranslator(translatorId) {
       return isAuthenticated() && (
         request.auth.uid == translatorId ||
-        (request.auth.token.role == 'TRANSLATOR' && 
-         request.auth.token.translatorProfileId == translatorId) ||
-        (exists(/databases/$(database)/documents/translator_profiles/$(translatorId)) &&
-         get(/databases/$(database)/documents/translator_profiles/$(translatorId)).data.email == request.auth.token.email)
+        request.auth.token.translatorProfileId == translatorId
       );
+    }
+
+    function isAdminOrSelf(userId) {
+      return isAdmin() || isOwner(userId);
     }
 
     // ==========================================
     // RULES FOR COLLECTIONS
     // ==========================================
 
+    // ─── Users ───────────────────────────────────────────────
     match /users/{userId} {
-      allow read: if isSuperAdmin() || isOwner(userId);
-      allow create: if isAuthenticated() && request.resource.data.role == 'TRANSLATOR';
-      allow update: if isSuperAdmin() || (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']));
-      allow delete: if isSuperAdmin();
+      allow read: if isAdmin() || isOwner(userId);
+      allow create: if isAdmin();
+      allow update: if isAdmin() || (isOwner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']));
+      allow delete: if isAdmin();
     }
 
+    // ─── Translator Profiles ────────────────────────────────
     match /translator_profiles/{profileId} {
       allow read: if isAuthenticated();
-      allow create, delete: if isSuperAdmin();
-      allow update: if isSuperAdmin() || (
-        isAssignedTranslator(profileId) && 
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'avatarUrl', 'phone'])
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        isOwnProfile(profileId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'avatarUrl', 'phone', 'languages', 'availability',
+          'currentLoadPoints', 'remainingCapacityPoints', 'utilizationPercentage'
+        ])
       );
     }
 
+    // ─── Languages ──────────────────────────────────────────
     match /languages/{languageId} {
       allow read: if isAuthenticated();
-      allow write: if isSuperAdmin();
+      allow write: if isAdmin();
     }
 
+    // ─── Assignments ────────────────────────────────────────
     match /assignments/{assignmentId} {
-      allow read: if isSuperAdmin() || isAssignedTranslator(resource.data.translatorId);
-      allow create, delete: if isSuperAdmin();
-      allow update: if isSuperAdmin() || (
+      allow read: if isAdmin() || isAssignedTranslator(resource.data.translatorId);
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
         isAssignedTranslator(resource.data.translatorId) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'status', 'startedAt', 'submittedAt', 'resultFileName', 'resultFileUrl', 
-          'submissionNotes', 'totalWorkingSeconds', 'totalIdleSeconds'
+          'status', 'startedAt', 'submittedAt', 'resultFileName', 'resultFileUrl',
+          'submissionNotes', 'totalWorkingSeconds', 'totalIdleSeconds',
+          'pauseCount', 'totalPauseDuration', 'effectiveWorkSeconds'
         ]) &&
         request.resource.data.status != 'COMPLETED' &&
         request.resource.data.status != 'CANCELLED'
       );
     }
 
+    // ─── Timer Logs ─────────────────────────────────────────
     match /timer_logs/{logId} {
-      allow read: if isSuperAdmin() || isAssignedTranslator(resource.data.translatorId);
-      allow create: if isAuthenticated() && (
+      allow read: if isAdmin() || isAssignedTranslator(resource.data.translatorId);
+      allow create: if isPenerjemah() && (
         request.resource.data.translatorId == request.auth.uid ||
         request.resource.data.translatorId == request.auth.token.translatorProfileId
       );
-      allow update: if isSuperAdmin() || (
+      allow update: if isAdmin() || (
         isAssignedTranslator(resource.data.translatorId) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['endTime', 'durationSeconds', 'reason'])
       );
-      allow delete: if isSuperAdmin();
+      allow delete: if isAdmin();
     }
 
+    // ─── Notifications ──────────────────────────────────────
     match /notifications/{notifId} {
-      allow read: if isSuperAdmin() || isOwner(resource.data.userId) || resource.data.userId == 'ALL';
-      allow create: if isSuperAdmin();
-      allow update, delete: if isSuperAdmin() || isOwner(resource.data.userId);
+      allow read: if isAdmin() || isOwner(resource.data.userId) || isAssignedTranslator(resource.data.userId) || resource.data.userId == 'ALL';
+      allow create: if isAdmin();
+      allow update, delete: if isAdmin() || isOwner(resource.data.userId) || isAssignedTranslator(resource.data.userId);
     }
 
+    // ─── System Settings ────────────────────────────────────
     match /system_settings/{docId} {
       allow read: if isAuthenticated();
-      allow write: if isSuperAdmin();
+      allow write: if isAdmin();
     }
 
+    // ─── Audit Logs (immutable) ─────────────────────────────
     match /audit_logs/{logId} {
-      allow read: if isSuperAdmin();
-      allow create: if isAuthenticated(); // written by client but immutable
-      allow update, delete: if false; // Audit logs must be immutable
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update, delete: if false;
     }
 
+    // ─── Activity Logs (write-once) ─────────────────────────
     match /activity_logs/{logId} {
-      allow read: if isSuperAdmin();
+      allow read: if isAdmin();
       allow create: if isAuthenticated();
-      allow update, delete: if false; // Activity logs are write-once
+      allow update, delete: if false;
+    }
+
+    // ─── Claimable Tasks ────────────────────────────────────
+    match /claimable_tasks/{taskId} {
+      allow read: if isAuthenticated();
+      allow create, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        isPenerjemah() && (
+          // Case 1: Claiming an available task
+          (resource.data.status == 'AVAILABLE' &&
+           request.resource.data.status == 'WORKING' &&
+           request.resource.data.claimedById == request.auth.uid &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'claimedById', 'claimedByName', 'claimedAt', 'startedAt']))
+          ||
+          // Case 2: Pausing or resuming timer
+          (resource.data.claimedById == request.auth.uid &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'pausedAt', 'startedAt', 'effectiveWorkSeconds', 'totalPauseDuration', 'pauseCount']))
+          ||
+          // Case 3: Submitting result
+          (resource.data.claimedById == request.auth.uid &&
+           (resource.data.status == 'WORKING' || resource.data.status == 'REVISION' || resource.data.status == 'PAUSED') &&
+           request.resource.data.status == 'WAITING_REVIEW' &&
+           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'submittedAt', 'resultFileUrl', 'resultFileName', 'submissionNotes']))
+        )
+      );
+    }
+
+    // ─── Reward Point History (immutable) ───────────────────
+    match /reward_point_history/{logId} {
+      allow read: if isAdmin() || (isPenerjemah() && resource.data.translatorId == request.auth.uid);
+      allow create: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // ─── Monthly Leaderboards ───────────────────────────────
+    match /monthly_leaderboards/{periodId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
     }
   }
 }

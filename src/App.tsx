@@ -1,6 +1,7 @@
 import React from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Sidebar } from './components/common/Sidebar';
+import { BottomNavigation } from './components/common/BottomNavigation';
 
 // Admin Components
 import { AdminDashboard } from './components/admin/AdminDashboard';
@@ -16,6 +17,10 @@ import { TranslatorDashboard } from './components/translator/TranslatorDashboard
 import { MyAssignmentsView } from './components/translator/MyAssignmentsView';
 import { TranslatorHistoryView } from './components/translator/TranslatorHistoryView';
 import { TranslatorProfileView } from './components/translator/TranslatorProfileView';
+import { ClaimableTasksView } from './components/translator/ClaimableTasksView';
+
+// Common Views
+import { LeaderboardView } from './components/common/LeaderboardView';
 
 // Modals
 import { NewAssignmentModal } from './components/modals/NewAssignmentModal';
@@ -24,18 +29,16 @@ import { ReviewSubmissionModal } from './components/modals/ReviewSubmissionModal
 import { PauseReasonModal } from './components/modals/PauseReasonModal';
 import { SubmitWorkModal } from './components/modals/SubmitWorkModal';
 import { NotificationDrawer } from './components/modals/NotificationDrawer';
+import { CustomDialog } from './components/common/CustomDialog';
 
 import { Login } from './components/common/Login';
 
 const MainLayout: React.FC = () => {
   const { currentRole, adminTab, translatorTab, currentUser } = useApp();
 
-  if (!currentUser) {
-    return <Login />;
-  }
-
   // Dynamic browser tab title based on navigation in Indonesian
   React.useEffect(() => {
+    if (!currentUser) return;
     const tabNames: Record<string, string> = {
       dashboard: 'Dashboard',
       translators: 'Manajemen Penerjemah',
@@ -44,14 +47,20 @@ const MainLayout: React.FC = () => {
       workload: 'Beban Kerja & Kapasitas',
       reports: 'Laporan Kinerja',
       settings: 'Pengaturan Sistem',
+      leaderboard: 'Papan Peringkat',
+      tasks: 'Pool Task Tersedia',
       history: 'Riwayat Kerja & Statistik',
       profile: 'Profil & Kapasitas',
     };
 
-    const currentTab = currentRole === 'SUPER_ADMIN' ? adminTab : translatorTab;
+    const currentTab = currentRole === 'ADMIN' ? adminTab : translatorTab;
     const label = tabNames[currentTab] || 'Ruang Kerja';
     document.title = `${label} | Sistem Monitoring Penerjemah by Master Translate`;
   }, [currentUser, currentRole, adminTab, translatorTab]);
+
+  if (!currentUser) {
+    return <Login />;
+  }
 
   const renderAdminTab = () => {
     switch (adminTab) {
@@ -65,6 +74,8 @@ const MainLayout: React.FC = () => {
         return <TimerMonitoring />;
       case 'workload':
         return <WorkloadOverview />;
+      case 'leaderboard':
+        return <LeaderboardView />;
       case 'reports':
         return <ReportsView />;
       case 'settings':
@@ -78,8 +89,12 @@ const MainLayout: React.FC = () => {
     switch (translatorTab) {
       case 'dashboard':
         return <TranslatorDashboard />;
+      case 'tasks':
+        return <ClaimableTasksView />;
       case 'assignments':
         return <MyAssignmentsView />;
+      case 'leaderboard':
+        return <LeaderboardView />;
       case 'history':
         return <TranslatorHistoryView />;
       case 'profile':
@@ -92,14 +107,15 @@ const MainLayout: React.FC = () => {
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-800 transition-colors font-sans antialiased flex">
       <Sidebar />
-      <main className="flex-1 min-w-0 overflow-x-hidden">
+      <main className="flex-1 min-w-0 overflow-x-hidden pb-20 md:pb-0">
         {/* pt-14 on mobile = clear the fixed h-14 topbar; no padding on md+ */}
         <div className="pt-14 md:pt-0">
           <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full">
-            {currentRole === 'SUPER_ADMIN' ? renderAdminTab() : renderTranslatorTab()}
+            {currentRole === 'ADMIN' ? renderAdminTab() : renderTranslatorTab()}
           </div>
         </div>
       </main>
+      <BottomNavigation />
 
       {/* Modals & Drawers */}
       <NewAssignmentModal />
@@ -108,6 +124,7 @@ const MainLayout: React.FC = () => {
       <PauseReasonModal />
       <SubmitWorkModal />
       <NotificationDrawer />
+      <CustomDialog />
     </div>
   );
 };

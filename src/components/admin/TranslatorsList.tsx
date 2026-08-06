@@ -34,14 +34,13 @@ export const TranslatorsList: React.FC = () => {
   const [editPhone, setEditPhone] = useState('');
   const [editAddress, setEditAddress] = useState('');
   const [editMaxCapacity, setEditMaxCapacity] = useState(20);
-  const [editRating, setEditRating] = useState(5.0);
   const [editLanguages, setEditLanguages] = useState<string[]>([]);
   const [editSpecialties, setEditSpecialties] = useState('');
   const [editCertifications, setEditCertifications] = useState('');
   const [editPaymentAccount, setEditPaymentAccount] = useState('');
   const [editSupportingDocs, setEditSupportingDocs] = useState('');
   const [editAvailability, setEditAvailability] = useState('');
-  const [editStatus, setEditStatus] = useState<any>('READY');
+  const [editStatus, setEditStatus] = useState<any>('FREE');
 
   const filteredTranslators = useMemo(() => {
     return translators.filter(
@@ -59,7 +58,6 @@ export const TranslatorsList: React.FC = () => {
     setEditPhone(tr.phone);
     setEditAddress(tr.address || '');
     setEditMaxCapacity(tr.maxCapacityPoints);
-    setEditRating(tr.rating);
     setEditLanguages(tr.languages || []);
     setEditSpecialties(tr.specialties?.join(', ') || '');
     setEditCertifications(tr.certifications?.join(', ') || '');
@@ -80,7 +78,6 @@ export const TranslatorsList: React.FC = () => {
         phone: editPhone.trim(),
         address: editAddress.trim(),
         maxCapacityPoints: editMaxCapacity,
-        rating: editRating,
         languages: editLanguages,
         specialties: editSpecialties.split(',').map((s) => s.trim()).filter(Boolean),
         certifications: editCertifications.split(',').map((c) => c.trim()).filter(Boolean),
@@ -158,10 +155,8 @@ export const TranslatorsList: React.FC = () => {
                   />
                   <div>
                     <h3 className="font-bold text-slate-800 text-sm">{tr.name}</h3>
-                    <div className="flex items-center gap-1 text-[11px] text-amber-500 font-semibold">
-                      <Star className="h-3 w-3 fill-amber-500" />
-                      <span>{tr.rating}</span>
-                      <span className="text-slate-400">({tr.completedJobsCount} selesai)</span>
+                    <div className="flex items-center gap-1 text-[11px] text-slate-400 font-semibold">
+                      <span>{tr.completedJobsCount} tugas selesai</span>
                     </div>
                   </div>
                 </div>
@@ -225,10 +220,10 @@ export const TranslatorsList: React.FC = () => {
                 <div className="flex justify-between text-xs font-semibold">
                   <span className="text-slate-600 flex items-center gap-1">
                     <PieChart className="h-3.5 w-3.5 text-pink-500" />
-                    Beban Kerja
+                    Beban Kerja Halaman
                   </span>
                   <span className="text-slate-800 font-mono">
-                    {tr.currentLoadPoints} / {tr.maxCapacityPoints} pt
+                    {tr.currentLoadPoints} / {tr.maxCapacityPoints} hlm
                   </span>
                 </div>
                 <div className="h-2 w-full rounded-full bg-slate-200 overflow-hidden">
@@ -244,7 +239,7 @@ export const TranslatorsList: React.FC = () => {
                   />
                 </div>
                 <div className="flex justify-between text-[10px] text-slate-400">
-                  <span>Tersisa: {tr.remainingCapacityPoints} pt</span>
+                  <span>Tersisa: {tr.remainingCapacityPoints} hlm</span>
                   <span>{tr.utilizationPercentage}% Terisi</span>
                 </div>
               </div>
@@ -274,17 +269,17 @@ export const TranslatorsList: React.FC = () => {
       {/* Edit Translator Modal */}
       {activeEditTranslator && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 bg-slate-50">
+          <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
+            
+            {/* Sticky Header */}
+            <div className="shrink-0 flex items-center justify-between border-b border-slate-200 px-6 py-4 bg-slate-50">
               <div className="flex items-center gap-2">
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-pink-600 text-white shadow-md shadow-pink-600/10">
                   <Edit3 className="h-4 w-4" />
                 </div>
                 <div>
-                  <h2 className="text-base font-bold text-slate-800">Edit Profil Penerjemah</h2>
-                  <p className="text-xs text-slate-400">
-                    Modifikasi informasi, rating, kualifikasi, & kapasitas ketersediaan
-                  </p>
+                  <h2 className="text-base font-bold text-slate-800">Ubah Profil Penerjemah</h2>
+                  <p className="text-xs text-slate-400">Modifikasi informasi, kualifikasi, & kapasitas ketersediaan</p>
                 </div>
               </div>
               <button
@@ -295,158 +290,89 @@ export const TranslatorsList: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSaveEdit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1 text-slate-700">
-                  <label className="text-xs font-semibold text-slate-600">Nama Lengkap *</label>
-                  <input
-                    type="text"
-                    required
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium focus:outline-none focus:border-pink-500"
-                  />
+            {/* Scrollable Form */}
+            <form onSubmit={handleSaveEdit} className="flex-1 flex flex-col overflow-hidden">
+              <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-slate-700">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-600">Nama Lengkap *</label>
+                    <input
+                      type="text"
+                      required
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-850 focus:outline-none focus:border-pink-500 transition-colors"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-600">Nomor Telepon *</label>
+                    <input
+                      type="text"
+                      required
+                      value={editPhone}
+                      onChange={(e) => setEditPhone(e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-850 focus:outline-none focus:border-pink-500 transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-slate-700">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-600">Alamat Email *</label>
+                    <input
+                      type="email"
+                      required
+                      value={editEmail}
+                      onChange={(e) => setEditEmail(e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-850 focus:outline-none focus:border-pink-500 transition-colors"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-slate-600">Alamat Rumah</label>
+                    <input
+                      type="text"
+                      value={editAddress}
+                      onChange={(e) => setEditAddress(e.target.value)}
+                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-850 focus:outline-none focus:border-pink-500 transition-colors"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-1 text-slate-700">
-                  <label className="text-xs font-semibold text-slate-600">WhatsApp / Telepon *</label>
-                  <input
-                    type="text"
-                    required
-                    value={editPhone}
-                    onChange={(e) => setEditPhone(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium focus:outline-none focus:border-pink-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1 text-slate-700">
-                  <label className="text-xs font-semibold text-slate-600">Alamat Email *</label>
-                  <input
-                    type="email"
-                    required
-                    value={editEmail}
-                    onChange={(e) => setEditEmail(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium focus:outline-none focus:border-pink-500"
-                  />
-                </div>
-
-                <div className="space-y-1 text-slate-700">
-                  <label className="text-xs font-semibold text-slate-600">Alamat Rumah</label>
-                  <input
-                    type="text"
-                    value={editAddress}
-                    onChange={(e) => setEditAddress(e.target.value)}
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium focus:outline-none focus:border-pink-500"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1 text-slate-700">
-                  <label className="text-xs font-semibold text-slate-600">Poin Kapasitas Beban Kerja Maksimal</label>
+                  <label className="text-xs font-semibold text-slate-600">Kapasitas Halaman Maksimal</label>
                   <input
                     type="number"
                     min="5"
                     max="100"
                     value={editMaxCapacity}
                     onChange={(e) => setEditMaxCapacity(parseInt(e.target.value) || 20)}
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium focus:outline-none focus:border-pink-500"
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-850 focus:outline-none focus:border-pink-500 transition-colors"
                   />
                 </div>
 
-                <div className="space-y-1 text-slate-700">
-                  <label className="text-xs font-semibold text-slate-600">Skor Penilaian / Rating (0 - 5)</label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="5"
-                    step="0.05"
-                    value={editRating}
-                    onChange={(e) => setEditRating(parseFloat(e.target.value) || 5.0)}
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium focus:outline-none focus:border-pink-500"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1 text-slate-700">
-                <label className="text-xs font-semibold text-slate-600">Bahasa yang Dikuasai</label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                  {settings.languageRules.map((rule) => {
-                    const isSelected = editLanguages.includes(rule.languageCode);
-                    return (
-                      <button
-                        key={rule.languageCode}
-                        type="button"
-                        onClick={() => toggleLanguage(rule.languageCode)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all text-center cursor-pointer ${
-                          isSelected
-                            ? 'bg-pink-600 text-white border-pink-600 shadow-sm'
-                            : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        {rule.languageCode}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1 text-slate-700">
-                  <label className="text-xs font-semibold text-slate-600">Spesialisasi (Koma)</label>
-                  <input
-                    type="text"
-                    value={editSpecialties}
-                    onChange={(e) => setEditSpecialties(e.target.value)}
-                    placeholder="Legal, Medis, Teknik"
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium focus:outline-none focus:border-pink-500"
-                  />
-                </div>
-
-                <div className="space-y-1 text-slate-700">
-                  <label className="text-xs font-semibold text-slate-600">Sertifikasi (Koma)</label>
-                  <input
-                    type="text"
-                    value={editCertifications}
-                    onChange={(e) => setEditCertifications(e.target.value)}
-                    placeholder="HPI Certified, ATA Member"
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium focus:outline-none focus:border-pink-500"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1 text-slate-700">
-                <label className="text-xs font-semibold text-slate-600">Rekening Pembayaran</label>
-                <input
-                  type="text"
-                  value={editPaymentAccount}
-                  onChange={(e) => setEditPaymentAccount(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium focus:outline-none focus:border-pink-500"
-                />
-              </div>
-
-              <div className="space-y-1 text-slate-700">
-                <label className="text-xs font-semibold text-slate-600">Dokumen Pendukung / Portofolio (Koma)</label>
-                <input
-                  type="text"
-                  value={editSupportingDocs}
-                  onChange={(e) => setEditSupportingDocs(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium focus:outline-none focus:border-pink-500"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1 text-slate-700">
-                  <label className="text-xs font-semibold text-slate-600">Jadwal Ketersediaan</label>
-                  <input
-                    type="text"
-                    value={editAvailability}
-                    onChange={(e) => setEditAvailability(e.target.value)}
-                    placeholder="Senin - Jumat 09:00 - 18:00"
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium focus:outline-none focus:border-pink-500"
-                  />
+                <div className="space-y-2 text-slate-700">
+                  <label className="text-xs font-semibold text-slate-600">Bahasa yang Dikuasai</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pr-1">
+                    {settings.languageRules.map((rule) => {
+                      const isSelected = editLanguages.includes(rule.languageCode);
+                      return (
+                        <button
+                          key={rule.languageCode}
+                          type="button"
+                          onClick={() => toggleLanguage(rule.languageCode)}
+                          className={`px-3 py-2 rounded-lg text-xs font-semibold border transition-all text-center cursor-pointer ${
+                            isSelected
+                              ? 'bg-pink-600 text-white border-pink-600 shadow-sm'
+                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100/50'
+                          }`}
+                        >
+                          {rule.languageCode}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <div className="space-y-1 text-slate-700">
@@ -454,26 +380,24 @@ export const TranslatorsList: React.FC = () => {
                   <select
                     value={editStatus}
                     onChange={(e) => setEditStatus(e.target.value as any)}
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium focus:outline-none focus:border-pink-500"
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-750 focus:outline-none focus:border-pink-500 transition-colors"
                   >
-                    <option value="READY">Ready</option>
-                    <option value="OFFLINE">Offline</option>
-                    <option value="ON_LEAVE">On Leave</option>
-                    <option value="WORKING">Working</option>
-                    <option value="PAUSED">Paused</option>
-                    <option value="REVISION">Revision</option>
-                    <option value="WAITING_REVIEW">Waiting Review</option>
+                    <option value="FREE">FREE (Siap Klaim Tugas)</option>
+                    <option value="BUSY">BUSY (Sedang Mengerjakan Tugas)</option>
+                    <option value="BREAK">BREAK (Sedang Istirahat / Jeda)</option>
+                    <option value="OFFLINE">OFFLINE (Tidak Aktif)</option>
                   </select>
                 </div>
+
+                {activeEditTranslator.updatedAt && (
+                  <div className="text-[10px] text-slate-400 font-mono pt-2">
+                    Terakhir Diupdate: {new Date(activeEditTranslator.updatedAt).toLocaleString()} | Versi: {activeEditTranslator.version || 1}
+                  </div>
+                )}
               </div>
 
-              {activeEditTranslator.updatedAt && (
-                <div className="text-[10px] text-slate-400 font-mono pt-2">
-                  Terakhir Diupdate: {new Date(activeEditTranslator.updatedAt).toLocaleString()} | Versi: {activeEditTranslator.version || 1}
-                </div>
-              )}
-
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+              {/* Sticky Footer */}
+              <div className="shrink-0 flex items-center justify-end gap-3 p-4 border-t border-slate-100 bg-slate-50/50">
                 <button
                   type="button"
                   onClick={() => setActiveEditTranslator(null)}

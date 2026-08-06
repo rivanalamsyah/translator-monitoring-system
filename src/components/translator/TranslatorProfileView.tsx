@@ -25,7 +25,7 @@ import {
   Award,
   Clock,
 } from 'lucide-react';
-import { AvatarUpload } from '../common/AvatarUpload';
+import { AvatarImage } from '../common/AvatarImage';
 import { StatusBadge } from '../common/Badge';
 import { formatDuration } from '../../utils/formatters';
 
@@ -42,7 +42,7 @@ export const TranslatorProfileView: React.FC = () => {
   const [editPaymentAccount, setEditPaymentAccount] = useState(currentTranslatorProfile?.paymentAccount || '');
   const [editSupportingDocs, setEditSupportingDocs] = useState(currentTranslatorProfile?.supportingDocuments?.join(', ') || '');
   const [editAvailability, setEditAvailability] = useState(currentTranslatorProfile?.availability || '');
-  const [editStatus, setEditStatus] = useState(currentTranslatorProfile?.status || 'READY');
+  const [editStatus, setEditStatus] = useState(currentTranslatorProfile?.status || 'FREE');
 
   if (!currentTranslatorProfile) {
     return (
@@ -106,9 +106,7 @@ export const TranslatorProfileView: React.FC = () => {
     setIsEditing(false);
   };
 
-  const handleAvatarUpload = (newAvatarUrl: string) => {
-    updateTranslator(currentTranslatorProfile.id, { avatar: newAvatarUrl }, currentTranslatorProfile.version);
-  };
+
 
   const toggleLanguage = (code: string) => {
     setEditLanguages((prev) =>
@@ -135,7 +133,7 @@ export const TranslatorProfileView: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Profile Card */}
         <div className="space-y-4">
-          {/* Avatar & Basic Info */}
+          {/* Avatar Display */}
           <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs space-y-5">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
@@ -145,19 +143,13 @@ export const TranslatorProfileView: React.FC = () => {
               <StatusBadge status={currentTranslatorProfile.status} size="sm" />
             </div>
 
-            {/* Avatar Upload */}
-            <AvatarUpload
-              currentAvatar={currentTranslatorProfile.avatar}
-              name={currentTranslatorProfile.name}
-              translatorId={currentTranslatorProfile.id}
-              onUploadComplete={handleAvatarUpload}
-            />
-
-            {currentTranslatorProfile.updatedAt && (
-              <div className="text-[10px] text-slate-400 text-center font-mono">
-                Terakhir diupdate: {new Date(currentTranslatorProfile.updatedAt).toLocaleString()} (Versi: {currentTranslatorProfile.version || 1})
-              </div>
-            )}
+            <div className="flex justify-center py-2">
+              <AvatarImage
+                src={currentTranslatorProfile.avatar}
+                name={currentTranslatorProfile.name}
+                className="h-24 w-24 rounded-full object-cover ring-4 ring-pink-400/30"
+              />
+            </div>
           </div>
 
           {/* Workload Capacity Gauge */}
@@ -196,15 +188,15 @@ export const TranslatorProfileView: React.FC = () => {
               <div className="grid grid-cols-3 gap-2 text-center text-xs">
                 <div className="rounded-lg bg-slate-50 border border-slate-100 p-2">
                   <p className="font-black text-pink-600 font-mono">{currentTranslatorProfile.currentLoadPoints}</p>
-                  <p className="text-[10px] text-slate-400">Terisi (pt)</p>
+                  <p className="text-[10px] text-slate-400">Terisi (hlm)</p>
                 </div>
                 <div className="rounded-lg bg-slate-50 border border-slate-100 p-2">
                   <p className="font-black text-emerald-600 font-mono">{currentTranslatorProfile.remainingCapacityPoints}</p>
-                  <p className="text-[10px] text-slate-400">Tersisa (pt)</p>
+                  <p className="text-[10px] text-slate-400">Tersisa (hlm)</p>
                 </div>
                 <div className="rounded-lg bg-slate-50 border border-slate-100 p-2">
                   <p className="font-black text-slate-800 font-mono">{currentTranslatorProfile.maxCapacityPoints}</p>
-                  <p className="text-[10px] text-slate-400">Maksimal (pt)</p>
+                  <p className="text-[10px] text-slate-400">Maksimal (hlm)</p>
                 </div>
               </div>
             </div>
@@ -232,7 +224,7 @@ export const TranslatorProfileView: React.FC = () => {
                     setEditPaymentAccount(currentTranslatorProfile.paymentAccount || '');
                     setEditSupportingDocs(currentTranslatorProfile.supportingDocuments?.join(', ') || '');
                     setEditAvailability(currentTranslatorProfile.availability || '');
-                    setEditStatus(currentTranslatorProfile.status || 'READY');
+                    setEditStatus(currentTranslatorProfile.status || 'FREE');
                     setIsEditing(true);
                   }}
                   className="flex items-center gap-1.5 rounded-lg border border-pink-200 bg-pink-50 hover:bg-pink-100 text-pink-700 px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer"
@@ -332,78 +324,18 @@ export const TranslatorProfileView: React.FC = () => {
                   </div>
                 </div>
 
-                {/* Certifications & Specialties */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-600">Sertifikasi (Pisahkan dengan koma)</label>
-                    <input
-                      type="text"
-                      value={editCertifications}
-                      onChange={(e) => setEditCertifications(e.target.value)}
-                      placeholder="contoh: HPI Certified, ATA Certified"
-                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-pink-500"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-slate-600">Spesialisasi (Pisahkan dengan koma)</label>
-                    <input
-                      type="text"
-                      value={editSpecialties}
-                      onChange={(e) => setEditSpecialties(e.target.value)}
-                      placeholder="contoh: Legal, Medical, Finance"
-                      className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-pink-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Payment Account */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-600">Rekening Pembayaran</label>
-                  <input
-                    type="text"
-                    value={editPaymentAccount}
-                    onChange={(e) => setEditPaymentAccount(e.target.value)}
-                    placeholder="contoh: Bank Mandiri 1234567890 a/n Nama Rekening"
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-pink-500"
-                  />
-                </div>
-
-                {/* Supporting Docs */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-600">Dokumen Pendukung / Link Portofolio (Koma)</label>
-                  <input
-                    type="text"
-                    value={editSupportingDocs}
-                    onChange={(e) => setEditSupportingDocs(e.target.value)}
-                    placeholder="contoh: CV.pdf, Ijazah.pdf, link_drive_portofolio"
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-pink-500"
-                  />
-                </div>
-
-                {/* Availability */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-slate-600">Jadwal Ketersediaan</label>
-                  <textarea
-                    rows={2}
-                    value={editAvailability}
-                    onChange={(e) => setEditAvailability(e.target.value)}
-                    placeholder="contoh: Senin - Jumat (09:00 - 18:00 WIB)"
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-800 focus:outline-none focus:border-pink-500"
-                  />
-                </div>
-
                 {/* Status Dropdown */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-slate-600">Status Ketersediaan</label>
                   <select
                     value={editStatus}
                     onChange={(e) => setEditStatus(e.target.value as any)}
-                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-pink-500"
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-850 focus:outline-none focus:border-pink-500"
                   >
-                    <option value="READY">Ready (Aktif & Siap Menerima Tugas)</option>
-                    <option value="OFFLINE">Offline (Tidak Aktif)</option>
-                    <option value="ON_LEAVE">On Leave (Sedang Cuti)</option>
+                    <option value="FREE">FREE (Siap Klaim Tugas)</option>
+                    <option value="BUSY">BUSY (Sedang Mengerjakan Tugas)</option>
+                    <option value="BREAK">BREAK (Sedang Istirahat / Jeda)</option>
+                    <option value="OFFLINE">OFFLINE (Tidak Aktif)</option>
                   </select>
                 </div>
               </div>
@@ -444,73 +376,6 @@ export const TranslatorProfileView: React.FC = () => {
                     ))}
                   </div>
                 </div>
-
-                {/* Specialties */}
-                <div className="space-y-1 sm:col-span-2">
-                  <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">Spesialisasi</p>
-                  {currentTranslatorProfile.specialties && currentTranslatorProfile.specialties.length > 0 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {currentTranslatorProfile.specialties.map((s) => (
-                        <span key={s} className="rounded bg-purple-50 text-purple-600 px-2 py-0.5 font-semibold text-[10px] border border-purple-100">
-                          {s}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-slate-400 italic text-[11px]">- Belum ada spesialisasi -</p>
-                  )}
-                </div>
-
-                {/* Certifications */}
-                <div className="space-y-1 sm:col-span-2">
-                  <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">Sertifikasi</p>
-                  {currentTranslatorProfile.certifications && currentTranslatorProfile.certifications.length > 0 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {currentTranslatorProfile.certifications.map((c) => (
-                        <span key={c} className="rounded bg-teal-50 text-teal-600 px-2 py-0.5 font-semibold text-[10px] border border-teal-100">
-                          {c}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-slate-400 italic text-[11px]">- Belum ada sertifikasi -</p>
-                  )}
-                </div>
-
-                {/* Payment Account */}
-                <div className="space-y-1 sm:col-span-2">
-                  <p className="text-[10px] font-bold uppercase text-slate-400">Rekening Pembayaran</p>
-                  <p className="text-slate-700 bg-slate-50 border border-slate-100 rounded-lg p-2 font-mono">
-                    {currentTranslatorProfile.paymentAccount || '-'}
-                  </p>
-                </div>
-
-                {/* Supporting Documents */}
-                <div className="space-y-1 sm:col-span-2">
-                  <p className="text-[10px] font-bold uppercase text-slate-400 mb-1">Dokumen Pendukung / Portofolio</p>
-                  {currentTranslatorProfile.supportingDocuments && currentTranslatorProfile.supportingDocuments.length > 0 ? (
-                    <div className="space-y-1">
-                      {currentTranslatorProfile.supportingDocuments.map((doc, idx) => (
-                        <div key={idx} className="flex items-center gap-1.5 bg-slate-50 border border-slate-150 p-2 rounded-lg truncate text-[11px]">
-                          <span className="font-bold text-slate-700">Link #{idx+1}:</span>
-                          <a href={doc.startsWith('http') ? doc : '#'} target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:underline truncate">
-                            {doc}
-                          </a>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-slate-400 italic text-[11px]">- Belum ada dokumen pendukung -</p>
-                  )}
-                </div>
-
-                {/* Availability */}
-                <div className="space-y-1 sm:col-span-2">
-                  <p className="text-[10px] font-bold uppercase text-slate-400">Jadwal Ketersediaan</p>
-                  <p className="text-slate-700 bg-slate-50 border border-slate-100 rounded-lg p-2 italic">
-                    {currentTranslatorProfile.availability || '-'}
-                  </p>
-                </div>
               </div>
             )}
           </div>
@@ -539,9 +404,9 @@ export const TranslatorProfileView: React.FC = () => {
             <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs text-center space-y-1">
               <Award className="h-5 w-5 text-purple-500 mx-auto" />
               <p className="text-xl font-black text-slate-800 font-mono">
-                {myAssignments.filter((a) => a.status === 'COMPLETED').reduce((acc, a) => acc + a.calculatedPoints, 0)} pt
+                {myAssignments.filter((a) => a.status === 'COMPLETED').reduce((acc, a) => acc + a.calculatedPoints, 0)} hlm
               </p>
-              <p className="text-[10px] text-slate-400">Total Poin Selesai</p>
+              <p className="text-[10px] text-slate-400">Total Halaman Selesai</p>
             </div>
           </div>
 
@@ -578,7 +443,7 @@ export const TranslatorProfileView: React.FC = () => {
                     </div>
                     <div className="text-right shrink-0 pl-3">
                       <p className="text-xs font-black text-emerald-600 font-mono">
-                        {a.calculatedPoints} pt
+                        {a.calculatedPoints} hlm
                       </p>
                       <p className="text-[10px] text-slate-400">
                         {formatDuration(a.totalWorkingSeconds)}

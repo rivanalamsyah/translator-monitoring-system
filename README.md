@@ -208,3 +208,21 @@ Proyek ini dilengkapi dengan unit testing menggunakan **Vitest** dan **Testing L
 - **Backup Rutin:** Jadwalkan ekspor data Firestore otomatis ke Cloud Storage menggunakan Cloud Scheduler dan Cloud Functions untuk mengantisipasi kehilangan data.
 - **Monitoring Error:** Aktifkan Google Cloud Logging untuk memantau logs Cloud Functions dan performa SLA dari Cron Job deadline (`deadlineCronJob`).
 - **Offboarding Penerjemah:** Saat menghapus penerjemah, pastikan untuk menonaktifkan akun mereka di Firebase Authentication dan mengubah status profil mereka ke `OFFLINE` untuk mencegah alokasi penugasan baru.
+
+
+Langkah 1: Buat Akun di Firebase Authentication
+Pertama, kita harus mendaftarkan email dan password untuk masuk ke aplikasi.
+
+Buka Firebase Console > Authentication.
+Pastikan Anda berada di tab Users.
+Klik tombol Add User (Tambah pengguna) di sebelah kanan.
+Buat akun pertama (Admin):
+Masukkan Email: admin@mastertranslate.com (atau email pilihan Anda).
+Masukkan Password: PasswordAdmin123! (atau password pilihan Anda).
+Klik Add user.
+PENTING: Setelah dibuat, salin (copy) kode acak yang ada di kolom User UID milik akun admin tersebut (misal: abc123xyz...). Simpan kode ini untuk Langkah 2.
+Klik Add User sekali lagi untuk membuat akun kedua (Penerjemah):
+Masukkan Email: translator@mastertranslate.com.
+Masukkan Password: PasswordTranslator123!.
+Klik Add user.
+PENTING: Salin kode User UID milik akun penerjemah tersebut. Simpan kode ini untuk Langkah 2.

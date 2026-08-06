@@ -22,18 +22,14 @@ import { getFirebaseAuth, getFirebaseDb } from '../lib/firebase';
 import { UserProfile, UserRole } from '../types';
 
 /**
- * Login dengan email & password via Firebase Auth.
- * Setelah login, ambil profil user dari Firestore koleksi `users`.
+ * Mendapatkan data profil user secara dinamis berdasarkan Firebase Auth UID dan Email.
+ * Mencari di koleksi `users`, dengan fallback pencarian di `translator_profiles` berdasarkan email.
  */
-export async function loginWithFirebase(
-  email: string,
-  password: string
+export async function getUserProfile(
+  uid: string,
+  email: string
 ): Promise<UserProfile | null> {
-  const auth = getFirebaseAuth();
   const db = getFirebaseDb();
-
-  const credential = await signInWithEmailAndPassword(auth, email, password);
-  const uid = credential.user.uid;
 
   // Cari di koleksi users
   const userDocRef = doc(db, 'users', uid);
@@ -51,7 +47,7 @@ export async function loginWithFirebase(
         id: snap.docs[0].id,
         name: data.name,
         email: data.email,
-        role: 'TRANSLATOR' as UserRole,
+        role: 'PENERJEMAH' as UserRole,
         avatar: data.avatarUrl || '',
         phone: data.phone || '',
       };
@@ -60,14 +56,33 @@ export async function loginWithFirebase(
   }
 
   const data = userSnap.data();
+  let mappedRole = data.role as UserRole;
+  if (data.role === 'super_admin') {
+    mappedRole = 'ADMIN';
+  } else if (data.role === 'translator') {
+    mappedRole = 'PENERJEMAH';
+  }
   return {
     id: uid,
     name: data.name,
     email: data.email,
-    role: data.role as UserRole,
+    role: mappedRole,
     avatar: data.avatarUrl || '',
     phone: data.phone || '',
   };
+}
+
+/**
+ * Login dengan email & password via Firebase Auth.
+ * Setelah login, ambil profil user menggunakan getUserProfile.
+ */
+export async function loginWithFirebase(
+  email: string,
+  password: string
+): Promise<UserProfile | null> {
+  const auth = getFirebaseAuth();
+  const credential = await signInWithEmailAndPassword(auth, email, password);
+  return getUserProfile(credential.user.uid, email);
 }
 
 /**

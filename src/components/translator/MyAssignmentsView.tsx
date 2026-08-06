@@ -75,8 +75,8 @@ export const MyAssignmentsView: React.FC = () => {
                 <p className="font-semibold text-slate-700">{a.pageCount} hlm</p>
               </div>
               <div>
-                <p className="text-slate-400 text-[10px] uppercase font-bold">Poin</p>
-                <p className="font-bold text-pink-600 font-mono">{a.calculatedPoints} pt</p>
+                <p className="text-slate-400 text-[10px] uppercase font-bold">Prioritas</p>
+                <p className="font-semibold text-slate-700">{a.priority}</p>
               </div>
             </div>
 

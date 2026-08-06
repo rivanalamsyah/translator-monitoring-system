@@ -1,10 +1,34 @@
 @import "tailwindcss";
 
+@theme {
+  --color-primary: #ec4899;
+  --color-primary-hover: #db2777;
+  --color-primary-soft: #fce7f3;
+  --color-background-custom: #fffdfe;
+  --color-surface-custom: #ffffff;
+  --color-border-custom: #f3e8f4;
+  --color-heading-custom: #111827;
+  --color-body-custom: #6b7280;
+
+  --font-heading: "Plus Jakarta Sans", sans-serif;
+  --font-body: "Nunito", sans-serif;
+}
+
 @layer base {
   body {
-    background-color: #F8FAFC;
-    color: #0F172A;
-    font-family: 'Quicksand', 'Fredoka', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: var(--color-background-custom);
+    color: var(--color-body-custom);
+    font-family: var(--font-body);
+  }
+
+  h1, h2, h3, h4, h5, h6, .font-heading {
+    font-family: var(--font-heading);
+    color: var(--color-heading-custom);
+  }
+
+  button, .font-button {
+    font-family: var(--font-heading);
+    font-weight: 600;
   }
 }
 

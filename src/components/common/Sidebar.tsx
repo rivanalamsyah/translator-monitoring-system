@@ -16,6 +16,7 @@ import {
   Menu,
   Download,
   X,
+  Trophy,
 } from 'lucide-react';
 import { AvatarImage } from './AvatarImage';
 import logoImg from '../../assets/logo.png';
@@ -73,7 +74,6 @@ export const Sidebar: React.FC = () => {
   } = useApp();
 
   const [isExpanded, setIsExpanded] = useState<boolean>(getSavedSidebarState);
-  const [isMobileOpen, setIsMobileOpen] = useState<boolean>(false);
 
   // PWA install prompt
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
@@ -129,66 +129,33 @@ export const Sidebar: React.FC = () => {
     try { localStorage.setItem(SIDEBAR_STORAGE_KEY, JSON.stringify(isExpanded)); } catch { /* ignore */ }
   }, [isExpanded]);
 
-  // ── Body scroll lock on mobile ──
-  useEffect(() => {
-    if (isMobileOpen) {
-      document.body.classList.add('sidebar-open');
-    } else {
-      document.body.classList.remove('sidebar-open');
-    }
-    return () => document.body.classList.remove('sidebar-open');
-  }, [isMobileOpen]);
-
-  // ── Esc key closes mobile sidebar ──
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape' && isMobileOpen) setIsMobileOpen(false);
-  }, [isMobileOpen]);
-
-  useEffect(() => {
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
-
-  // ── Auto-close on desktop resize ──
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth >= 768) {
-        setIsMobileOpen(false);
-        document.body.classList.remove('sidebar-open');
-      }
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
   // ── Nav items ──
   const adminNavItems: NavItem[] = [
     { id: 'dashboard',    label: 'Dashboard',             icon: LayoutDashboard },
-    { id: 'translators',  label: 'Manajemen Penerjemah',  icon: Users           },
-    { id: 'assignments',  label: 'Daftar Tugas',          icon: FileText        },
-    { id: 'timers',       label: 'Pemantau Waktu',        icon: Clock           },
-    { id: 'workload',     label: 'Beban Kerja & Poin',    icon: PieChart        },
-    { id: 'reports',      label: 'Laporan Kinerja',       icon: BarChart3       },
-    { id: 'settings',     label: 'Pengaturan Sistem',     icon: Settings        },
+    { id: 'assignments',  label: 'Tugas',                 icon: FileText        },
+    { id: 'translators',  label: 'Penerjemah',            icon: Users           },
+    { id: 'leaderboard',  label: 'Leaderboard',           icon: Trophy          },
+    { id: 'reports',      label: 'Laporan',               icon: BarChart3       },
+    { id: 'settings',     label: 'Pengaturan',            icon: Settings        },
   ];
 
   const translatorNavItems: NavItem[] = [
-    { id: 'dashboard',   label: 'Dashboard',                    icon: LayoutDashboard },
-    { id: 'assignments', label: 'Tugas Saya',                   icon: FileText        },
-    { id: 'history',     label: 'Riwayat Kerja & Statistik',   icon: CheckCircle2    },
-    { id: 'profile',     label: 'Profil & Kapasitas',           icon: User            },
+    { id: 'dashboard',    label: 'Dashboard',                    icon: LayoutDashboard },
+    { id: 'tasks',        label: 'Tugas',                        icon: FileText        },
+    { id: 'leaderboard',  label: 'Leaderboard',                  icon: Trophy          },
+    { id: 'profile',      label: 'Profil',                       icon: User            },
   ];
 
-  const items      = currentRole === 'SUPER_ADMIN' ? adminNavItems : translatorNavItems;
-  const currentTab = currentRole === 'SUPER_ADMIN' ? adminTab      : translatorTab;
-  const setTab     = currentRole === 'SUPER_ADMIN' ? setAdminTab   : setTranslatorTab;
-  const isAdmin    = currentRole === 'SUPER_ADMIN';
+  const items      = currentRole === 'ADMIN' ? adminNavItems : translatorNavItems;
+  const currentTab = currentRole === 'ADMIN' ? adminTab      : translatorTab;
+  const setTab     = currentRole === 'ADMIN' ? setAdminTab   : setTranslatorTab;
+  const isAdmin    = currentRole === 'ADMIN';
   const displayName = isAdmin ? 'Super Admin' : currentTranslatorProfile?.name;
   const displayRole = isAdmin
     ? 'Administrator Sistem'
     : `Penerjemah • ${currentTranslatorProfile?.languages?.join(', ')}`;
 
-  const handleNavClick = (id: string) => { setTab(id); setIsMobileOpen(false); };
+  const handleNavClick = (id: string) => { setTab(id); };
 
   // ── Shared sidebar inner content ──────────────────────────────────────────
   const SidebarInner = ({ collapsed }: { collapsed?: boolean }) => (
@@ -370,21 +337,8 @@ export const Sidebar: React.FC = () => {
           ═══════════════════════════════════════════════════════════════════════ */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 h-14
         bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-sm
-        flex items-center px-4 gap-3"
+        flex items-center px-4"
       >
-        <button
-          onClick={() => setIsMobileOpen(true)}
-          aria-label="Buka menu navigasi"
-          aria-expanded={isMobileOpen}
-          className="flex items-center justify-center h-9 w-9 rounded-xl
-            bg-slate-100 text-slate-600
-            hover:bg-pink-100 hover:text-pink-600
-            active:scale-95 transition-all duration-150
-            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400"
-        >
-          <Menu className="h-4.5 w-4.5" />
-        </button>
-
         <img src={logoImg} alt="Master Translate" className="h-7 w-auto object-contain" />
 
         <div className="ml-auto flex items-center gap-2">
@@ -393,46 +347,6 @@ export const Sidebar: React.FC = () => {
           </span>
         </div>
       </div>
-
-      {/* ═══════════════════════════════════════════════════════════════════════
-          MOBILE: Overlay (blur + darken)
-          ═══════════════════════════════════════════════════════════════════════ */}
-      <div
-        className={`fixed inset-0 z-40 md:hidden transition-all duration-300
-          ${isMobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
-        aria-hidden="true"
-        onClick={() => setIsMobileOpen(false)}
-        style={{
-          backgroundColor: 'rgba(15,23,42,0.5)',
-          backdropFilter: 'blur(5px)',
-          WebkitBackdropFilter: 'blur(5px)',
-        }}
-      />
-
-      {/* ═══════════════════════════════════════════════════════════════════════
-          MOBILE: Sidebar drawer (slides in from left)
-          ═══════════════════════════════════════════════════════════════════════ */}
-      <aside
-        aria-label="Sidebar navigasi mobile"
-        aria-modal={isMobileOpen}
-        className={`fixed top-0 bottom-0 left-0 z-50 md:hidden
-          w-[280px] bg-white border-r border-slate-200/80 shadow-2xl
-          transition-transform duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]
-          ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
-      >
-        {/* Mobile drawer close button */}
-        <button
-          onClick={() => setIsMobileOpen(false)}
-          aria-label="Tutup menu"
-          className="absolute top-3 right-3 z-10 flex items-center justify-center
-            h-7 w-7 rounded-lg bg-slate-100 text-slate-500
-            hover:bg-pink-100 hover:text-pink-600
-            transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400"
-        >
-          <X className="h-4 w-4" />
-        </button>
-        <SidebarInner />
-      </aside>
 
       {/* ═══════════════════════════════════════════════════════════════════════
           DESKTOP: Collapsible sidebar

@@ -1,13 +1,7 @@
 import {
-  TranslatorProfile,
-  Assignment,
-  ActivityLogItem,
-  SystemNotification,
   SystemSettings,
   LanguagePointRule,
 } from '../types';
-import avatarMale from '../assets/avatar_male.png';
-import avatarFemale from '../assets/avatar_female.png';
 
 export const INITIAL_LANGUAGE_RULES: LanguagePointRule[] = [
   { languageCode: 'EN-ID', languageName: 'Inggris → Indonesia', pointsPerPage: 1.0 },
@@ -19,14 +13,6 @@ export const INITIAL_LANGUAGE_RULES: LanguagePointRule[] = [
   { languageCode: 'RU-ID', languageName: 'Rusia → Indonesia', pointsPerPage: 1.8 },
   { languageCode: 'FR-ID', languageName: 'Prancis → Indonesia', pointsPerPage: 1.5 },
 ];
-
-export const INITIAL_TRANSLATORS: TranslatorProfile[] = [];
-
-export const INITIAL_ASSIGNMENTS: Assignment[] = [];
-
-export const INITIAL_ACTIVITY_LOGS: ActivityLogItem[] = [];
-
-export const INITIAL_NOTIFICATIONS: SystemNotification[] = [];
 
 export const INITIAL_SYSTEM_SETTINGS: SystemSettings = {
   autoAssignEnabled: true,

@@ -10,6 +10,11 @@ import {
   AlertTriangle,
   Download,
   Link2,
+  Trophy,
+  Star,
+  Zap,
+  Target,
+  ChevronRight,
 } from 'lucide-react';
 import { StatusBadge, PriorityBadge } from '../common/Badge';
 import { formatClock, formatDuration, formatDate } from '../../utils/formatters';
@@ -24,6 +29,11 @@ export const TranslatorDashboard: React.FC = () => {
     setActiveSubmitAssignment,
     submitAssignment,
     timerLogs,
+    confirmAction,
+    toggleTranslatorStatus,
+    claimableTasks,
+    claimTask,
+    setTranslatorTab,
   } = useApp();
 
   const [driveUrl, setDriveUrl] = useState('');
@@ -31,12 +41,10 @@ export const TranslatorDashboard: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  if (!currentTranslatorProfile) {
-    return <div className="p-8 text-center text-slate-400 font-medium">Memuat ruang kerja penerjemah...</div>;
-  }
-
   // Find assignments strictly belonging to this active translator
-  const myAssignments = assignments.filter((a) => a.translatorId === currentTranslatorProfile.id);
+  const myAssignments = currentTranslatorProfile
+    ? assignments.filter((a) => a.translatorId === currentTranslatorProfile.id)
+    : [];
 
   // Active Job (Working, Paused, or Revision)
   const activeJob = myAssignments.find(
@@ -52,6 +60,10 @@ export const TranslatorDashboard: React.FC = () => {
     setErrorMsg('');
     setIsAccessConfirmed(false);
   }, [activeJob?.id, activeJob?.resultFileUrl]);
+
+  if (!currentTranslatorProfile) {
+    return <div className="p-8 text-center text-slate-400 font-medium">Memuat ruang kerja penerjemah...</div>;
+  }
 
   const handleDriveSubmit = () => {
     setErrorMsg('');
@@ -94,6 +106,8 @@ export const TranslatorDashboard: React.FC = () => {
   // Filter timer logs for active job
   const jobTimerLogs = activeJob ? timerLogs.filter((tl) => tl.assignmentId === activeJob.id) : [];
 
+  const isWorking = currentTranslatorProfile.status === 'BUSY' || currentTranslatorProfile.status === 'BREAK';
+
   return (
     <div className="space-y-6">
       {/* Welcome Banner */}
@@ -106,11 +120,34 @@ export const TranslatorDashboard: React.FC = () => {
           <h2 className="text-xl font-bold text-white">Selamat datang kembali, {currentTranslatorProfile.name}!</h2>
           <p className="text-xs text-pink-100/90">
             Bahasa: <span className="font-bold text-white">{currentTranslatorProfile.languages.join(', ')}</span> • Kapasitas Saat Ini:{' '}
-            <span className="font-bold text-white font-mono">{currentTranslatorProfile.currentLoadPoints} / {currentTranslatorProfile.maxCapacityPoints} pt</span>
+            <span className="font-bold text-white font-mono">{currentTranslatorProfile.currentLoadPoints} / {currentTranslatorProfile.maxCapacityPoints} hlm</span>
           </p>
         </div>
 
-        <StatusBadge status={currentTranslatorProfile.status} size="lg" />
+        {/* Status Switch Toggle (Red = Ready, Green = Working) */}
+        <div className="flex items-center justify-between bg-white/10 rounded-xl p-3 border border-white/20 min-w-[180px]">
+          <div className="text-left mr-3">
+            <p className="text-[9px] font-extrabold text-pink-200 uppercase tracking-wider">Status Tugas</p>
+            <p className={`text-[11px] font-bold mt-0.5 ${isWorking ? 'text-emerald-300' : 'text-rose-300'}`}>
+              {currentTranslatorProfile.status === 'BUSY' ? 'Sibuk (BUSY)' : currentTranslatorProfile.status === 'BREAK' ? 'Istirahat (BREAK)' : 'Bebas (FREE)'}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => toggleTranslatorStatus(currentTranslatorProfile.id)}
+            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+              isWorking ? 'bg-emerald-500' : 'bg-rose-500'
+            }`}
+            title={isWorking ? 'Ubah ke Siap Kerja' : 'Ubah ke Sedang Bertugas'}
+          >
+            <span
+              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
+                isWorking ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
       </div>
 
       {/* 6 Personal Metric Widgets */}
@@ -133,14 +170,6 @@ export const TranslatorDashboard: React.FC = () => {
           <p className="text-[10px] text-slate-400">Tenggat 24 Jam</p>
         </div>
 
-        <div className="rounded-xl border border-pink-200 bg-pink-50/50 p-3 shadow-xs">
-          <p className="text-[10px] font-bold text-pink-600 uppercase">Status Timer</p>
-          <p className="text-lg font-black text-pink-700">
-            {activeJob?.status === 'WORKING' ? 'BERJALAN' : activeJob?.status === 'PAUSED' ? 'DIJEDA' : 'NONAKTIF'}
-          </p>
-          <p className="text-[10px] text-pink-600/80">Telemetri Langsung</p>
-        </div>
-
         <div className="rounded-xl border border-teal-200 bg-teal-50/50 p-3 shadow-xs">
           <p className="text-[10px] font-bold text-teal-600 uppercase">Selesai</p>
           <p className="text-lg font-black text-teal-700">{completedCount}</p>
@@ -152,7 +181,70 @@ export const TranslatorDashboard: React.FC = () => {
           <p className="text-lg font-black text-rose-700">{revisionCount}</p>
           <p className="text-[10px] text-rose-600/80">Butuh Perbaikan</p>
         </div>
+
+        {/* Reward Points Widget */}
+        <div className="rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-3 shadow-xs">
+          <p className="text-[10px] font-bold text-amber-600 uppercase flex items-center gap-1">
+            <Trophy className="w-3 h-3 text-amber-500" /> Reward Poin
+          </p>
+          <p className="text-lg font-black text-amber-700">{currentTranslatorProfile.points || 0}</p>
+          <p className="text-[10px] text-amber-600/80">Lv.{Math.floor((currentTranslatorProfile.points || 0) / 100) + 1}</p>
+        </div>
       </div>
+
+      {/* Task Pool Quick Preview */}
+      {(() => {
+        const availableTasks = claimableTasks
+          .filter((t) => t.status === 'AVAILABLE')
+          .filter((t) =>
+            !currentTranslatorProfile.languages?.length ||
+            currentTranslatorProfile.languages.some(
+              (l) => t.languageFrom.includes(l.split('-')[0]) || l.includes(t.languageFrom)
+            )
+          )
+          .slice(0, 3);
+
+        if (availableTasks.length === 0) return null;
+
+        return (
+          <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border border-emerald-200 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Zap className="w-4 h-4 text-emerald-600" />
+                <h3 className="text-sm font-bold text-emerald-800">Task Tersedia untuk Diklaim!</h3>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500 text-white">
+                  {claimableTasks.filter((t) => t.status === 'AVAILABLE').length} task
+                </span>
+              </div>
+              <button
+                onClick={() => setTranslatorTab('tasks')}
+                className="flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-900 transition-colors"
+              >
+                Lihat Semua <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {availableTasks.map((task) => (
+                <div key={task.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2.5 border border-emerald-100 shadow-xs">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-slate-800 truncate">{task.title}</p>
+                    <p className="text-[10px] text-slate-400">{task.code} • {task.pageCount} hal • {task.languageFrom}</p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 ml-3">
+                    <span className="text-sm font-extrabold text-amber-600">{task.rewardPoints} pt</span>
+                    <button
+                      onClick={() => claimTask(task.id)}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-bold transition-colors flex items-center gap-1"
+                    >
+                      <Target className="w-3 h-3" /> Ambil
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Main Command Console: Active Job Controller */}
       {activeJob ? (
@@ -198,8 +290,8 @@ export const TranslatorDashboard: React.FC = () => {
                   <p className="font-bold text-slate-800">{activeJob.pageCount} halaman</p>
                 </div>
                 <div>
-                  <p className="text-slate-400 text-[10px] font-bold uppercase">Poin Beban Kerja</p>
-                  <p className="font-bold text-pink-600 font-mono">{activeJob.calculatedPoints} pt</p>
+                  <p className="text-slate-400 text-[10px] font-bold uppercase">Klien / Organisasi</p>
+                  <p className="font-bold text-slate-850 truncate">{activeJob.clientName || '-'}</p>
                 </div>
                 <div>
                   <p className="text-slate-400 text-[10px] font-bold uppercase">Tenggat Waktu</p>
@@ -217,7 +309,14 @@ export const TranslatorDashboard: React.FC = () => {
                   </div>
                 </div>
                 <button
-                  onClick={() => alert('Mengunduh berkas sumber... (Simulasi)')}
+                  onClick={() => confirmAction({
+                    title: 'Unduh Berkas Sumber',
+                    message: 'Mengunduh berkas sumber dokumen untuk proyek terjemahan Anda... (Simulasi)',
+                    type: 'info',
+                    confirmText: 'Tutup',
+                    showCancel: false,
+                    onConfirm: () => {}
+                  })}
                   className="flex items-center gap-1 rounded bg-pink-600 hover:bg-pink-700 text-white px-3 py-1.5 text-xs font-semibold shadow-md shadow-pink-600/10 cursor-pointer transition-colors"
                 >
                   <Download className="h-3.5 w-3.5" />
@@ -374,9 +473,9 @@ export const TranslatorDashboard: React.FC = () => {
       ) : (
         <div className="rounded-xl border border-slate-200 bg-white p-12 text-center space-y-3 shadow-xs">
           <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto" />
-          <h3 className="text-base font-bold text-slate-800">Tidak Ada Tugas Aktif yang Berjalan</h3>
+          <h3 className="text-base font-bold text-slate-800">Tidak Ada Tugas Aktif</h3>
           <p className="text-xs text-slate-400 max-w-md mx-auto">
-            Saat ini Anda tidak memiliki pengukur waktu pengerjaan yang aktif. Super Admin akan menetapkan tugas dokumen baru berdasarkan kompetensi bahasa & kapasitas beban kerja Anda.
+            Saat ini Anda tidak memiliki pengukur waktu pengerjaan yang aktif. Silakan masuk ke menu <strong>Tugas</strong> untuk melihat daftar proyek yang tersedia di Task Pool dan klaim tugas baru.
           </p>
         </div>
       )}

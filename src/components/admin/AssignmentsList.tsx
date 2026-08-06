@@ -10,6 +10,7 @@ import {
   Clock,
   LayoutGrid,
   List,
+  Scissors,
 } from 'lucide-react';
 import { StatusBadge, PriorityBadge } from '../common/Badge';
 import { formatDate, formatDocumentType } from '../../utils/formatters';
@@ -22,6 +23,9 @@ export const AssignmentsList: React.FC = () => {
     reassignAssignment,
     setIsNewAssignmentModalOpen,
     setActiveReviewAssignment,
+    confirmAction,
+    splitAssignmentIntoTasks,
+    claimableTasks,
   } = useApp();
 
   const [viewMode, setViewMode] = useState<'table' | 'kanban'>('table');
@@ -47,10 +51,10 @@ export const AssignmentsList: React.FC = () => {
         <div>
           <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
             <FileText className="h-5 w-5 text-pink-600" />
-            <span>Siklus Hidup Penugasan Terjemahan</span>
+            <span>Siklus Hidup Tugas Terjemahan</span>
           </h2>
           <p className="text-xs text-slate-400">
-            Pantau, tetapkan, alihkan, dan audit semua dokumen melalui alur persetujuan
+            Pantau status, publikasi pool, dan tinjau hasil pekerjaan seluruh penerjemah
           </p>
         </div>
 
@@ -108,7 +112,7 @@ export const AssignmentsList: React.FC = () => {
             className="flex items-center gap-1.5 rounded-lg bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 text-xs font-bold shadow-md shadow-pink-600/10 transition-all cursor-pointer"
           >
             <Plus className="h-4 w-4" />
-            <span>Penugasan Baru</span>
+            <span>Tugas Baru</span>
           </button>
         </div>
       </div>
@@ -166,46 +170,9 @@ export const AssignmentsList: React.FC = () => {
                       </td>
 
                       <td className="py-3.5 px-3">
-                        {reassigningDocId === a.id ? (
-                          <select
-                            autoFocus
-                            onChange={(e) => {
-                              if (e.target.value) {
-                                const targetTr = translators.find((t) => t.id === e.target.value);
-                                if (targetTr && targetTr.remainingCapacityPoints < a.calculatedPoints) {
-                                  const confirmProceed = confirm(
-                                    `Peringatan: Penerjemah ${targetTr.name} hanya memiliki sisa kapasitas ${targetTr.remainingCapacityPoints} pt, sedangkan penugasan ini memerlukan ${a.calculatedPoints} pt.\n\nApakah Anda tetap ingin mengalihkan penugasan?`
-                                  );
-                                  if (!confirmProceed) {
-                                    setReassigningDocId(null);
-                                    return;
-                                  }
-                                }
-                                reassignAssignment(a.id, e.target.value);
-                                setReassigningDocId(null);
-                              }
-                            }}
-                            onBlur={() => setReassigningDocId(null)}
-                            className="rounded-lg border border-pink-500 bg-white px-2 py-1 text-xs text-slate-800 focus:outline-none"
-                          >
-                            <option value="">Pilih Penerjemah...</option>
-                            {translators.map((t) => (
-                              <option key={t.id} value={t.id}>
-                                {t.name} (Sisa: {t.remainingCapacityPoints} pt)
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <div
-                            onClick={() => setReassigningDocId(a.id)}
-                            className="flex items-center gap-1.5 cursor-pointer hover:text-pink-600 transition-colors"
-                          >
-                            <span className="font-medium text-slate-700">
-                              {a.translatorName || 'Belum Ditugaskan'}
-                            </span>
-                            <UserCheck className="h-3 w-3 text-slate-400" />
-                          </div>
-                        )}
+                        <span className="font-medium text-slate-700">
+                          {a.translatorName || 'Belum Diklaim (Task Pool)'}
+                        </span>
                       </td>
 
                       <td className="py-3.5 px-3">
@@ -221,6 +188,7 @@ export const AssignmentsList: React.FC = () => {
                       </td>
 
                       <td className="py-3.5 px-3 text-right space-x-1">
+                        {/* No split button required anymore */}
                         {a.status === 'WAITING_REVIEW' && (
                           <button
                             onClick={() => setActiveReviewAssignment(a)}
@@ -288,7 +256,7 @@ export const AssignmentsList: React.FC = () => {
                       <p className="text-[10px] text-slate-400">{item.clientName}</p>
 
                       <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
-                        <span className="text-slate-500 font-medium">{item.translatorName || 'Belum Ditugaskan'}</span>
+                        <span className="text-slate-500 font-medium">{item.translatorName || 'Belum Diklaim (Pool)'}</span>
                         <span className="font-mono font-bold text-pink-600">{item.calculatedPoints} pt</span>
                       </div>
                     </div>

@@ -1,14 +1,10 @@
-export type UserRole = 'SUPER_ADMIN' | 'TRANSLATOR';
+export type UserRole = 'ADMIN' | 'PENERJEMAH';
 
 export type TranslatorStatus =
-  | 'READY'
-  | 'ASSIGNED'
-  | 'WORKING'
-  | 'PAUSED'
-  | 'WAITING_REVIEW'
-  | 'REVISION'
-  | 'OFFLINE'
-  | 'ON_LEAVE';
+  | 'FREE'
+  | 'BUSY'
+  | 'BREAK'
+  | 'OFFLINE';
 
 export type AssignmentStatus =
   | 'UNASSIGNED'
@@ -53,7 +49,6 @@ export interface TranslatorProfile {
   status: TranslatorStatus;
   activeAssignmentId?: string;
   completedJobsCount: number;
-  rating: number; // e.g. 4.9
   address?: string;
   certifications?: string[];
   specialties?: string[];
@@ -62,6 +57,14 @@ export interface TranslatorProfile {
   availability?: string;
   updatedAt?: string;
   version?: number;
+  points?: number;
+  level?: number;
+  xp?: number;
+  achievements?: string[];
+  onTimeRate?: number;
+  accuracyRate?: number;
+  revisionRate?: number;
+  performanceTrend?: 'UP' | 'DOWN' | 'STABLE';
 }
 
 export interface Assignment {
@@ -88,6 +91,9 @@ export interface Assignment {
   estimatedMinutes: number;
   totalWorkingSeconds: number;
   totalIdleSeconds: number;
+  pauseCount?: number;
+  totalPauseDuration?: number;
+  effectiveWorkSeconds?: number;
   sourceFileUrl?: string;
   sourceFileName?: string;
   resultFileUrl?: string;
@@ -95,6 +101,7 @@ export interface Assignment {
   submissionNotes?: string;
   revisionNotes?: string;
   createdBy: string;
+  difficulty?: 'EASY' | 'MEDIUM' | 'HARD';
 }
 
 export interface TimerLog {
@@ -138,6 +145,15 @@ export interface LanguagePointRule {
   pointsPerPage: number;
 }
 
+export interface PointRuleConfig {
+  basePointsPerPage: number;
+  difficultyMultipliers: { EASY: number; MEDIUM: number; HARD: number };
+  speedBonusPoints: number;
+  qualityBonusPoints: number;
+  revisionPenaltyPoints: number;
+  latePenaltyPoints: number;
+}
+
 export interface SystemSettings {
   autoAssignEnabled: boolean;
   defaultCapacityPoints: number;
@@ -145,4 +161,61 @@ export interface SystemSettings {
   languageRules: LanguagePointRule[];
   emailNotificationsEnabled: boolean;
   pushNotificationsEnabled: boolean;
+  pointRules?: PointRuleConfig;
+}
+
+export interface ClaimableTask {
+  id: string;
+  orderId: string; // references parent assignment/order
+  code: string; // e.g. TASK-DOC-001-P1
+  title: string;
+  documentType: string;
+  languageFrom: string;
+  languageTo: string;
+  pageCount: number;
+  priority: Priority;
+  difficulty: 'EASY' | 'MEDIUM' | 'HARD';
+  estimatedMinutes: number;
+  deadlineAt: string;
+  rewardPoints: number;
+  status: 'AVAILABLE' | 'CLAIMED' | 'WORKING' | 'PAUSED' | 'WAITING_REVIEW' | 'REVISION' | 'COMPLETED';
+  claimedById?: string;
+  claimedByName?: string;
+  claimedAt?: string;
+  submittedAt?: string;
+  completedAt?: string;
+  resultFileUrl?: string;
+  resultFileName?: string;
+  submissionNotes?: string;
+  revisionNotes?: string;
+  pauseCount?: number;
+  totalPauseDuration?: number;
+  effectiveWorkSeconds?: number;
+  startedAt?: string;
+  pausedAt?: string;
+}
+
+export interface RewardPointHistory {
+  id: string;
+  translatorId: string;
+  taskId: string;
+  taskTitle: string;
+  points: number;
+  type: 'BASE' | 'SPEED_BONUS' | 'QUALITY_BONUS' | 'LATE_PENALTY' | 'REVISION_PENALTY';
+  timestamp: string;
+}
+
+export interface MonthlyLeaderboard {
+  id: string; // YYYY-MM
+  period: string; // YYYY-MM
+  rankings: {
+    translatorId: string;
+    translatorName: string;
+    points: number;
+    tasksCompletedCount: number;
+    pagesCount: number;
+    effectiveWorkSeconds: number;
+    averageSecondsPerPage: number;
+  }[];
+  createdAt: string;
 }

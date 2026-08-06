@@ -52,13 +52,29 @@ export function formatRelativeTime(isoString?: string): string {
 
 export function getStatusTheme(status: TranslatorStatus | AssignmentStatus) {
   switch (status) {
-    case 'READY':
+    case 'FREE':
+      return {
+        bg: 'bg-pink-50',
+        text: 'text-pink-750',
+        border: 'border-pink-200/60',
+        dot: 'bg-pink-500',
+        label: 'FREE',
+      };
+    case 'BUSY':
       return {
         bg: 'bg-emerald-50',
         text: 'text-emerald-700',
         border: 'border-emerald-200/60',
-        dot: 'bg-emerald-500',
-        label: 'Siap Kerja',
+        dot: 'bg-emerald-500 animate-pulse',
+        label: 'BUSY',
+      };
+    case 'BREAK':
+      return {
+        bg: 'bg-amber-50',
+        text: 'text-amber-700',
+        border: 'border-amber-200/60',
+        dot: 'bg-amber-500 animate-pulse',
+        label: 'BREAK',
       };
     case 'ASSIGNED':
       return {
@@ -70,10 +86,10 @@ export function getStatusTheme(status: TranslatorStatus | AssignmentStatus) {
       };
     case 'WORKING':
       return {
-        bg: 'bg-pink-50',
-        text: 'text-pink-700',
-        border: 'border-pink-200/60',
-        dot: 'bg-pink-500 animate-pulse',
+        bg: 'bg-emerald-50',
+        text: 'text-emerald-700',
+        border: 'border-emerald-200/60',
+        dot: 'bg-emerald-500 animate-pulse',
         label: 'Sedang Mengerjakan',
       };
     case 'PAUSED':
@@ -115,14 +131,6 @@ export function getStatusTheme(status: TranslatorStatus | AssignmentStatus) {
         border: 'border-slate-200/60',
         dot: 'bg-slate-400',
         label: 'Offline',
-      };
-    case 'ON_LEAVE':
-      return {
-        bg: 'bg-orange-50',
-        text: 'text-orange-700',
-        border: 'border-orange-200/60',
-        dot: 'bg-orange-500',
-        label: 'Sedang Cuti',
       };
     case 'UNASSIGNED':
       return {

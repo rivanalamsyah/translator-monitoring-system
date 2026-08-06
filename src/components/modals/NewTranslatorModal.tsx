@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { X, UserPlus, Languages } from 'lucide-react';
+import { X, UserPlus, Languages, Lock } from 'lucide-react';
 
 export const NewTranslatorModal: React.FC = () => {
   const { isNewTranslatorModalOpen, setIsNewTranslatorModalOpen, addTranslator, settings } = useApp();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [maxCapacityPoints, setMaxCapacityPoints] = useState<number>(20);
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>(['EN-ID']);
@@ -19,35 +20,43 @@ export const NewTranslatorModal: React.FC = () => {
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim() || !phone.trim()) return;
 
-    addTranslator({
-      name: name.trim(),
-      email: email.trim(),
-      phone: phone.trim(),
-      languages: selectedLanguages.length > 0 ? selectedLanguages : ['EN-ID'],
-      maxCapacityPoints,
-    });
+    try {
+      await addTranslator({
+        name: name.trim(),
+        email: email.trim(),
+        password: password.trim() || undefined,
+        phone: phone.trim(),
+        languages: selectedLanguages.length > 0 ? selectedLanguages : ['EN-ID'],
+        maxCapacityPoints,
+      });
 
-    setName('');
-    setEmail('');
-    setPhone('');
-    setIsNewTranslatorModalOpen(false);
+      setName('');
+      setEmail('');
+      setPassword('');
+      setPhone('');
+      setIsNewTranslatorModalOpen(false);
+    } catch (err) {
+      // Error is handled in AppContext
+    }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 bg-slate-50">
+      <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
+        
+        {/* Sticky Header */}
+        <div className="shrink-0 flex items-center justify-between border-b border-slate-200 px-6 py-4 bg-slate-50">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-pink-600 text-white shadow-md shadow-pink-600/10">
               <UserPlus className="h-4 w-4" />
             </div>
             <div>
               <h2 className="text-base font-bold text-slate-800">Daftarkan Penerjemah</h2>
-              <p className="text-xs text-slate-400">Tambahkan profil penerjemah baru & kapasitas beban kerja</p>
+              <p className="text-xs text-slate-400">Tambahkan profil penerjemah baru & buat akun masuk</p>
             </div>
           </div>
           <button
@@ -58,90 +67,110 @@ export const NewTranslatorModal: React.FC = () => {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="space-y-1 text-slate-700">
-            <label className="text-xs font-semibold text-slate-600">Nama Lengkap *</label>
-            <input
-              type="text"
-              required
-              placeholder="contoh: Maya Lin"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-850 placeholder-slate-400 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/50 transition-colors"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4 text-slate-755">
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-600">Alamat Email *</label>
-              <input
-                type="email"
-                required
-                placeholder="penerjemah@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-850 placeholder-slate-400 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/50 transition-colors"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-600">Nomor Telepon *</label>
+        {/* Scrollable Form */}
+        <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            
+            <div className="space-y-1 text-slate-700">
+              <label className="text-xs font-semibold text-slate-600">Nama Lengkap *</label>
               <input
                 type="text"
                 required
-                placeholder="+62 8xx-xxxx-xxxx"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                placeholder="contoh: Maya Lin"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
                 className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-850 placeholder-slate-400 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/50 transition-colors"
               />
             </div>
-          </div>
 
-          <div className="space-y-1 text-slate-700">
-            <label className="text-xs font-semibold text-slate-600">
-              Poin Kapasitas Beban Kerja Maksimal
-            </label>
-            <input
-              type="number"
-              min="5"
-              max="100"
-              value={maxCapacityPoints}
-              onChange={(e) => setMaxCapacityPoints(parseInt(e.target.value) || 20)}
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-850 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/50 transition-colors"
-            />
-            <p className="text-[10px] text-slate-400">
-              Kapasitas standar adalah 20 poin (~20 halaman bahasa Inggris atau 10 halaman bahasa Jepang).
-            </p>
-          </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-slate-755">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-600">Alamat Email *</label>
+                <input
+                  type="email"
+                  required
+                  placeholder="penerjemah@email.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-850 placeholder-slate-400 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/50 transition-colors"
+                />
+              </div>
 
-          <div className="space-y-2 text-slate-700">
-            <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
-              <Languages className="h-3.5 w-3.5 text-pink-600" />
-              Bahasa yang Dikuasai
-            </label>
-            <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto pr-1">
-              {settings.languageRules.map((rule) => {
-                const isSelected = selectedLanguages.includes(rule.languageCode);
-                return (
-                  <button
-                    key={rule.languageCode}
-                    type="button"
-                    onClick={() => toggleLanguage(rule.languageCode)}
-                    className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs text-left border transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-pink-600 text-white border-pink-600 font-bold shadow-sm'
-                        : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100/50'
-                    }`}
-                  >
-                    <span>{rule.languageCode}</span>
-                    <span className="text-[10px] opacity-80">{rule.pointsPerPage}x</span>
-                  </button>
-                );
-              })}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-600">Nomor Telepon *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="+62 8xx-xxxx-xxxx"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-850 placeholder-slate-400 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/50 transition-colors"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1 text-slate-700">
+              <label className="text-xs font-semibold text-slate-600 flex items-center gap-1">
+                <Lock className="h-3 w-3 text-pink-600" />
+                Kata Sandi Akun *
+              </label>
+              <input
+                type="password"
+                required
+                minLength={6}
+                placeholder="Minimal 6 karakter"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-850 placeholder-slate-400 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/50 transition-colors"
+              />
+            </div>
+
+            <div className="space-y-1 text-slate-700">
+              <label className="text-xs font-semibold text-slate-600">
+                Kapasitas Halaman Maksimal
+              </label>
+              <input
+                type="number"
+                min="5"
+                max="100"
+                value={maxCapacityPoints}
+                onChange={(e) => setMaxCapacityPoints(parseInt(e.target.value) || 20)}
+                className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-850 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/50 transition-colors"
+              />
+              <p className="text-[10px] text-slate-400">
+                Kapasitas standar adalah 20 halaman.
+              </p>
+            </div>
+
+            <div className="space-y-2 text-slate-700">
+              <label className="text-xs font-semibold text-slate-600 flex items-center gap-1.5">
+                <Languages className="h-3.5 w-3.5 text-pink-600" />
+                Bahasa yang Dikuasai
+              </label>
+              <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto pr-1">
+                {settings.languageRules.map((rule) => {
+                  const isSelected = selectedLanguages.includes(rule.languageCode);
+                  return (
+                    <button
+                      key={rule.languageCode}
+                      type="button"
+                      onClick={() => toggleLanguage(rule.languageCode)}
+                      className={`flex items-center justify-between rounded-lg px-3 py-2 text-xs text-left border transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-pink-600 text-white border-pink-600 font-bold shadow-sm'
+                          : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100/50'
+                      }`}
+                    >
+                      <span>{rule.languageCode}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+          {/* Sticky Footer */}
+          <div className="shrink-0 flex items-center justify-end gap-3 p-4 border-t border-slate-100 bg-slate-50/50">
             <button
               type="button"
               onClick={() => setIsNewTranslatorModalOpen(false)}
@@ -157,6 +186,7 @@ export const NewTranslatorModal: React.FC = () => {
             </button>
           </div>
         </form>
+
       </div>
     </div>
   );

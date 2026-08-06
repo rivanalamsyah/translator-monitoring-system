@@ -30,9 +30,10 @@ export const ReviewSubmissionModal: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 bg-slate-50">
+      <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white shadow-2xl overflow-hidden max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
+        
+        {/* Sticky Header */}
+        <div className="shrink-0 flex items-center justify-between border-b border-slate-200 px-6 py-4 bg-slate-50">
           <div className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-pink-600 text-white shadow-md shadow-pink-600/10">
               <FileCheck className="h-4 w-4" />
@@ -52,8 +53,8 @@ export const ReviewSubmissionModal: React.FC = () => {
           </button>
         </div>
 
-        {/* Details Body */}
-        <div className="p-6 space-y-4">
+        {/* Scrollable Details Body */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-2 text-xs text-slate-700">
             <div className="flex justify-between">
               <span className="text-slate-400">Penerjemah:</span>
@@ -62,7 +63,7 @@ export const ReviewSubmissionModal: React.FC = () => {
             <div className="flex justify-between">
               <span className="text-slate-400">Pasangan Bahasa & Halaman:</span>
               <span className="font-semibold text-slate-750">
-                {activeReviewAssignment.languageFrom} ({activeReviewAssignment.pageCount} halaman, {activeReviewAssignment.calculatedPoints} pt)
+                {activeReviewAssignment.languageFrom} ({activeReviewAssignment.pageCount} halaman)
               </span>
             </div>
             <div className="flex justify-between">
@@ -83,7 +84,7 @@ export const ReviewSubmissionModal: React.FC = () => {
           <div className="rounded-lg border border-pink-100 bg-pink-50/70 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-start gap-2.5 min-w-0">
               <FileCheck className="h-5 w-5 text-pink-600 mt-0.5 shrink-0" />
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-xs font-bold text-pink-700">Tautan Hasil Pekerjaan (Google Drive):</p>
                 <p className="text-[10px] text-slate-500 truncate font-mono mt-0.5">{activeReviewAssignment.resultFileUrl || '-'}</p>
               </div>
@@ -93,7 +94,7 @@ export const ReviewSubmissionModal: React.FC = () => {
                 href={activeReviewAssignment.resultFileUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1 shrink-0 rounded-lg bg-pink-600 text-white px-3 py-1.5 text-xs font-bold hover:bg-pink-700 transition-colors shadow-md shadow-pink-600/10 cursor-pointer"
+                className="flex items-center justify-center gap-1 shrink-0 rounded-lg bg-pink-600 text-white px-3 py-1.5 text-xs font-bold hover:bg-pink-700 transition-colors shadow-md shadow-pink-600/10 cursor-pointer"
               >
                 <span>Buka Dokumen</span>
               </a>
@@ -110,42 +111,47 @@ export const ReviewSubmissionModal: React.FC = () => {
             </div>
           )}
 
-          {/* Revision Form Toggle */}
-          {isRevisionMode ? (
-            <form onSubmit={handleSendRevision} className="space-y-3 pt-2">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-rose-600 flex items-center gap-1">
-                  <AlertTriangle className="h-4 w-4 text-rose-500" />
-                  Tentukan Catatan Umpan Balik Revisi *
-                </label>
-                <textarea
-                  required
-                  rows={3}
-                  placeholder="Jelaskan dengan jelas bagian mana yang membutuhkan perbaikan..."
-                  value={revisionNotes}
-                  onChange={(e) => setRevisionNotes(e.target.value)}
-                  className="w-full rounded-lg border border-rose-200 bg-rose-50/20 p-3 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-rose-500 transition-colors"
-                />
-              </div>
+          {/* Revision Note input inside the scroll area if active */}
+          {isRevisionMode && (
+            <div className="space-y-1 pt-2 animate-in slide-in-from-top-2 duration-200">
+              <label className="text-xs font-bold text-rose-600 flex items-center gap-1">
+                <AlertTriangle className="h-4 w-4 text-rose-500" />
+                Tentukan Catatan Umpan Balik Revisi *
+              </label>
+              <textarea
+                required
+                rows={3}
+                placeholder="Jelaskan dengan jelas bagian mana yang membutuhkan perbaikan..."
+                value={revisionNotes}
+                onChange={(e) => setRevisionNotes(e.target.value)}
+                className="w-full rounded-lg border border-rose-200 bg-rose-50/20 p-3 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-rose-500 transition-colors"
+              />
+            </div>
+          )}
+        </div>
 
-              <div className="flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsRevisionMode(false)}
-                  className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-50 transition-colors cursor-pointer"
-                >
-                  Kembali
-                </button>
-                <button
-                  type="submit"
-                  className="rounded-lg bg-rose-600 hover:bg-rose-700 text-white px-4 py-1.5 text-xs font-bold shadow-md shadow-rose-655/10 transition-colors cursor-pointer"
-                >
-                  Kirim Permintaan Revisi
-                </button>
-              </div>
-            </form>
+        {/* Sticky Footer */}
+        <div className="shrink-0 flex items-center justify-between p-4 border-t border-slate-100 bg-slate-50/50">
+          {isRevisionMode ? (
+            <div className="flex items-center justify-end gap-2 w-full">
+              <button
+                type="button"
+                onClick={() => setIsRevisionMode(false)}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                Kembali
+              </button>
+              <button
+                type="button"
+                onClick={handleSendRevision}
+                disabled={!revisionNotes.trim()}
+                className="rounded-lg bg-rose-600 hover:bg-rose-700 text-white px-5 py-2 text-xs font-bold shadow-md shadow-rose-600/10 transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Kirim Permintaan Revisi
+              </button>
+            </div>
           ) : (
-            <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+            <div className="flex items-center justify-between w-full">
               <button
                 type="button"
                 onClick={() => setIsRevisionMode(true)}
@@ -166,6 +172,7 @@ export const ReviewSubmissionModal: React.FC = () => {
             </div>
           )}
         </div>
+
       </div>
     </div>
   );
