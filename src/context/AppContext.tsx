@@ -329,7 +329,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         subscribeTimerLogs(translatorIdFilter, (data) => store.setTimerLogs(data)),
         subscribeNotifications(currentUser.id, (data) => store.setNotifications(data)),
         listenTasks(!isTranslator, translatorIdFilter, (data) => store.setTasks(data)),
-        listenRewardPointHistory((data) => store.setRewardPointHistory(data))
+        listenRewardPointHistory(translatorIdFilter, (data) => store.setRewardPointHistory(data))
       );
 
       if (currentUser?.role === 'ADMIN') {

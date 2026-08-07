@@ -65,6 +65,14 @@
         { "fieldPath": "claimedById", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "reward_point_history",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "translatorId", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

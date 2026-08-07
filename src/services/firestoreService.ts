@@ -151,10 +151,9 @@ export function subscribeTranslators(
   callback: (data: TranslatorProfile[]) => void
 ): Unsubscribe {
   const db = getFirebaseDb();
-  // Filter users collection where role is 'PENERJEMAH' to list translator profiles
+  // Query translator_profiles directly so both Admin and Translators can read it
   const q = query(
-    collection(db, 'users'),
-    where('role', '==', 'PENERJEMAH'),
+    collection(db, 'translator_profiles'),
     limit(100)
   );
   return onSnapshot(q, (snap) => {
@@ -693,9 +692,23 @@ export function listenClaimableTasks(
   return listenTasks(isAdmin, translatorId, callback);
 }
 
-export function listenRewardPointHistory(callback: (history: RewardPointHistory[]) => void): Unsubscribe {
+export function listenRewardPointHistory(
+  translatorId: string | undefined,
+  callback: (history: RewardPointHistory[]) => void
+): Unsubscribe {
   const db = getFirebaseDb();
-  const q = query(collection(db, 'reward_point_history'), orderBy('timestamp', 'desc'), limit(50));
+  const q = translatorId
+    ? query(
+        collection(db, 'reward_point_history'),
+        where('translatorId', '==', translatorId),
+        orderBy('timestamp', 'desc'),
+        limit(50)
+      )
+    : query(
+        collection(db, 'reward_point_history'),
+        orderBy('timestamp', 'desc'),
+        limit(50)
+      );
   return onSnapshot(q, (snapshot) => {
     const history: RewardPointHistory[] = [];
     snapshot.forEach((doc) => {
