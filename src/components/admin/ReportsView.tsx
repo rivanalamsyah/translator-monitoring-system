@@ -151,131 +151,221 @@ export const ReportsView: React.FC = () => {
     const doc = new jsPDF('p', 'mm', 'a4');
     const filename = `laporan_${activeReport}_${Date.now()}.pdf`;
 
-    // Font setting
+    // 1. Draw Kop Surat (Header)
+    // Logo Mark - stylized custom graphic: a pink rounded square with 'MT' in white
+    doc.setFillColor(219, 39, 119); // Fuchsia-600
+    doc.roundedRect(14, 10, 15, 15, 3, 3, 'F');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.setTextColor(236, 72, 153); // Pink-500 Color
-    doc.text('Laporan Operasional TMS - Master Translate', 14, 15);
+    doc.setFontSize(10);
+    doc.setTextColor(255, 255, 255);
+    doc.text('MT', 18, 20);
+
+    // Company Name & Details
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.setTextColor(30, 41, 59); // Slate-800
+    doc.text('MASTER TRANSLATE INDONESIA', 34, 15);
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.setTextColor(100, 116, 139);
-    doc.text(`Kategori: Laporan ${activeReport.toUpperCase()} | Unduh: ${new Date().toLocaleDateString('id-ID')}`, 14, 22);
-    doc.text('---------------------------------------------------------------------------------------------------------------------------------', 14, 26);
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 116, 139); // Slate-500
+    doc.text('Jl. Kemang Raya No. 12, Mampang Prapatan, Jakarta Selatan 12730', 34, 20);
+    doc.text('Telp: +62 21-555-1234 | Email: info@mastertranslate.com | Web: www.mastertranslate.com', 34, 24);
 
-    let y = 35;
+    // Decorative Lines separating header
+    doc.setDrawColor(219, 39, 119); // Fuchsia-600
+    doc.setLineWidth(0.8);
+    doc.line(14, 29, 196, 29);
+    doc.setDrawColor(226, 232, 240); // Slate-200
+    doc.setLineWidth(0.2);
+    doc.line(14, 31, 196, 31);
+
+    // 2. Metadata Section
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(17, 24, 39);
+    doc.setFontSize(11);
+    doc.setTextColor(15, 23, 42); // Slate-900
+    let reportTitle = '';
+    let currentHeaders: { label: string; x: number; w: number }[] = [];
 
     if (activeReport === 'task') {
-      // Columns: Kode (20), Judul (60), Klien (30), Penerjemah (35), Halaman (15), Status (25)
-      doc.text('Kode', 14, y);
-      doc.text('Judul Dokumen', 34, y);
-      doc.text('Klien', 94, y);
-      doc.text('Penerjemah', 124, y);
-      doc.text('Hlm', 159, y);
-      doc.text('Status', 174, y);
-      
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(51, 65, 85);
-      
-      filteredTasks.forEach((t) => {
-        y += 8;
-        if (y > 280) { doc.addPage(); y = 20; }
-        doc.text(t.code, 14, y);
-        doc.text(t.title.substring(0, 28), 34, y);
-        doc.text(t.clientName.substring(0, 14), 94, y);
-        doc.text((t.translatorName || 'Belum Klaim').substring(0, 16), 124, y);
-        doc.text(String(t.pageCount), 159, y);
-        doc.text(t.status, 174, y);
-      });
+      reportTitle = 'LAPORAN OPERASIONAL TASK POOL';
+      currentHeaders = [
+        { label: 'KODE', x: 16, w: 20 },
+        { label: 'JUDUL DOKUMEN', x: 38, w: 60 },
+        { label: 'KLIEN', x: 98, w: 30 },
+        { label: 'PENERJEMAH', x: 128, w: 34 },
+        { label: 'HLM', x: 162, w: 12 },
+        { label: 'STATUS', x: 174, w: 22 }
+      ];
     } else if (activeReport === 'translator') {
-      // Columns: Nama (50), Status (20), Bahasa (50), Selesai (20), Beban (20), Kapasitas (20)
-      doc.text('Nama Penerjemah', 14, y);
-      doc.text('Status', 64, y);
-      doc.text('Keahlian Bahasa', 84, y);
-      doc.text('Selesai', 134, y);
-      doc.text('Beban', 154, y);
-      doc.text('Maks', 174, y);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(51, 65, 85);
-
-      translators.forEach((t) => {
-        y += 8;
-        if (y > 280) { doc.addPage(); y = 20; }
-        doc.text(t.name.substring(0, 22), 14, y);
-        doc.text(t.status, 64, y);
-        doc.text(t.languages.join(', ').substring(0, 22), 84, y);
-        doc.text(String(t.completedJobsCount), 134, y);
-        doc.text(`${t.currentLoadPoints} hlm`, 154, y);
-        doc.text(`${t.maxCapacityPoints} hlm`, 174, y);
-      });
+      reportTitle = 'LAPORAN KINERJA & KAPASITAS PENERJEMAH';
+      currentHeaders = [
+        { label: 'NAMA PENERJEMAH', x: 16, w: 50 },
+        { label: 'STATUS', x: 66, w: 22 },
+        { label: 'KEAHLIAN BAHASA', x: 88, w: 46 },
+        { label: 'SELESAI', x: 134, w: 22 },
+        { label: 'BEBAN KERJA', x: 156, w: 22 },
+        { label: 'KAPASITAS', x: 178, w: 22 }
+      ];
     } else if (activeReport === 'productivity') {
-      // Columns: Tanggal (50), Tugas Selesai (40), Total Halaman (40), Poin Terkumpul (50)
-      doc.text('Tanggal', 14, y);
-      doc.text('Tugas Selesai', 64, y);
-      doc.text('Total Halaman', 104, y);
-      doc.text('Poin Terdistribusi', 144, y);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(51, 65, 85);
-
-      productivityData.forEach((d) => {
-        y += 8;
-        if (y > 280) { doc.addPage(); y = 20; }
-        doc.text(d.date, 14, y);
-        doc.text(`${d.count} tugas`, 64, y);
-        doc.text(`${d.pages} hlm`, 104, y);
-        doc.text(`${d.points} Pt`, 144, y);
-      });
+      reportTitle = 'LAPORAN PRODUKTIVITAS HARIAN';
+      currentHeaders = [
+        { label: 'TANGGAL', x: 16, w: 45 },
+        { label: 'TUGAS SELESAI', x: 61, w: 45 },
+        { label: 'TOTAL HALAMAN', x: 106, w: 45 },
+        { label: 'POIN TERDISTRIBUSI', x: 151, w: 45 }
+      ];
     } else if (activeReport === 'worktime') {
-      // Columns: Kode (20), Judul (50), Penerjemah (40), Halaman (15), Kerja (30), Jeda (30)
-      doc.text('Kode', 14, y);
-      doc.text('Judul Tugas', 34, y);
-      doc.text('Penerjemah', 84, y);
-      doc.text('Hlm', 124, y);
-      doc.text('Waktu Kerja', 139, y);
-      doc.text('Waktu Jeda', 169, y);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(51, 65, 85);
-
-      filteredTasks
-        .filter((t) => t.status === 'COMPLETED')
-        .forEach((t) => {
-          y += 8;
-          if (y > 280) { doc.addPage(); y = 20; }
-          doc.text(t.code, 14, y);
-          doc.text(t.title.substring(0, 24), 34, y);
-          doc.text((t.translatorName || '-').substring(0, 18), 84, y);
-          doc.text(String(t.pageCount), 124, y);
-          doc.text(formatClock(t.effectiveWorkSeconds || t.totalWorkingSeconds || 0), 139, y);
-          doc.text(formatClock(t.totalPauseDuration || t.totalIdleSeconds || 0), 169, y);
-        });
+      reportTitle = 'LAPORAN WAKTU EFEKTIF & JEDA PENERJEMAH';
+      currentHeaders = [
+        { label: 'KODE', x: 16, w: 20 },
+        { label: 'JUDUL TUGAS', x: 38, w: 58 },
+        { label: 'PENERJEMAH', x: 96, w: 34 },
+        { label: 'HLM', x: 130, w: 12 },
+        { label: 'WAKTU KERJA', x: 142, w: 27 },
+        { label: 'WAKTU JEDA', x: 169, w: 27 }
+      ];
     } else if (activeReport === 'points') {
-      // Columns: Penerjemah (60), Level (30), Poin Skor (50), Tugas Selesai (40)
-      doc.text('Nama Penerjemah', 14, y);
-      doc.text('Tingkat Level', 74, y);
-      doc.text('Skor Poin', 104, y);
-      doc.text('Tugas Selesai', 144, y);
+      reportTitle = 'LAPORAN PROFIL & DISTRIBUSI POIN';
+      currentHeaders = [
+        { label: 'NAMA PENERJEMAH', x: 16, w: 60 },
+        { label: 'TINGKAT LEVEL', x: 76, w: 40 },
+        { label: 'SKOR POIN', x: 116, w: 40 },
+        { label: 'TUGAS SELESAI', x: 156, w: 40 }
+      ];
+    }
+
+    doc.text(reportTitle, 14, 40);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Tanggal Cetak : ${new Date().toLocaleDateString('id-ID', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}`, 14, 45);
+    doc.text(`Dicetak Oleh   : Super Admin (Sistem Monitoring Penerjemah)`, 14, 49);
+
+    let y = 57;
+
+    // Helper to draw footer
+    const drawFooter = () => {
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(7.5);
+      doc.setTextColor(148, 163, 184); // Slate-400
+      doc.text('Dokumen ini dihasilkan secara otomatis oleh Sistem Monitoring Penerjemah. Rahasia & Terbatas.', 14, 287);
+      doc.text(`Halaman ${doc.getCurrentPageInfo().pageNumber}`, 180, 287);
+    };
+
+    // Helper to draw table header background
+    const drawTableHeader = (headers: { label: string; x: number; w: number }[]) => {
+      doc.setFillColor(30, 41, 59); // Deep Slate-800
+      doc.rect(14, y, 182, 8, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(255, 255, 255);
+      headers.forEach((h) => {
+        doc.text(h.label, h.x, y + 5.5);
+      });
+      y += 8;
+    };
+
+    // Helper to draw rows
+    const drawRow = (index: number, cells: { text: string; x: number; w: number }[]) => {
+      // Zebra striping
+      if (index % 2 === 1) {
+        doc.setFillColor(248, 250, 252); // Very light slate-50
+        doc.rect(14, y, 182, 7.5, 'F');
+      }
+
+      // Row bottom border
+      doc.setDrawColor(241, 245, 249); // Slate-100
+      doc.setLineWidth(0.15);
+      doc.line(14, y + 7.5, 196, y + 7.5);
 
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      doc.setTextColor(51, 65, 85);
-
-      translators.forEach((t) => {
-        y += 8;
-        if (y > 280) { doc.addPage(); y = 20; }
-        doc.text(t.name, 14, y);
-        doc.text(`Level ${t.level || 1}`, 74, y);
-        doc.text(`${t.points || 0} Poin`, 104, y);
-        doc.text(`${t.completedJobsCount} tugas`, 144, y);
+      doc.setFontSize(8);
+      doc.setTextColor(51, 65, 85); // Slate-600
+      cells.forEach((c) => {
+        doc.text(c.text, c.x, y + 5);
       });
+
+      y += 7.5;
+
+      // Page break check
+      if (y > 275) {
+        drawFooter();
+        doc.addPage();
+        y = 20; // start higher on subsequent pages
+        drawTableHeader(currentHeaders);
+      }
+    };
+
+    // Render Table based on activeReport
+    if (activeReport === 'task') {
+      drawTableHeader(currentHeaders);
+      filteredTasks.forEach((t, i) => {
+        const cells = [
+          { text: t.code, x: 16, w: 20 },
+          { text: t.title.length > 33 ? t.title.substring(0, 30) + '...' : t.title, x: 38, w: 60 },
+          { text: t.clientName.length > 15 ? t.clientName.substring(0, 13) + '...' : t.clientName, x: 98, w: 30 },
+          { text: (t.translatorName || 'Belum Klaim').substring(0, 18), x: 128, w: 34 },
+          { text: String(t.pageCount), x: 162, w: 12 },
+          { text: t.status, x: 174, w: 22 }
+        ];
+        drawRow(i, cells);
+      });
+      drawFooter();
+    } else if (activeReport === 'translator') {
+      drawTableHeader(currentHeaders);
+      translators.forEach((t, i) => {
+        const cells = [
+          { text: t.name.length > 25 ? t.name.substring(0, 22) + '...' : t.name, x: 16, w: 50 },
+          { text: t.status, x: 66, w: 22 },
+          { text: t.languages.join(', ').substring(0, 22), x: 88, w: 46 },
+          { text: `${t.completedJobsCount} tugas`, x: 134, w: 22 },
+          { text: `${t.currentLoadPoints} hlm`, x: 156, w: 22 },
+          { text: `${t.maxCapacityPoints} hlm`, x: 178, w: 22 }
+        ];
+        drawRow(i, cells);
+      });
+      drawFooter();
+    } else if (activeReport === 'productivity') {
+      drawTableHeader(currentHeaders);
+      productivityData.forEach((d, i) => {
+        const cells = [
+          { text: d.date, x: 16, w: 45 },
+          { text: `${d.count} tugas`, x: 61, w: 45 },
+          { text: `${d.pages} hlm`, x: 106, w: 45 },
+          { text: `${d.points} Pt`, x: 151, w: 45 }
+        ];
+        drawRow(i, cells);
+      });
+      drawFooter();
+    } else if (activeReport === 'worktime') {
+      drawTableHeader(currentHeaders);
+      const completedTasks = filteredTasks.filter((t) => t.status === 'COMPLETED');
+      completedTasks.forEach((t, i) => {
+        const cells = [
+          { text: t.code, x: 16, w: 20 },
+          { text: t.title.length > 30 ? t.title.substring(0, 27) + '...' : t.title, x: 38, w: 58 },
+          { text: (t.translatorName || '-').substring(0, 18), x: 96, w: 34 },
+          { text: String(t.pageCount), x: 130, w: 12 },
+          { text: formatClock(t.effectiveWorkSeconds || t.totalWorkingSeconds || 0), x: 142, w: 27 },
+          { text: formatClock(t.totalPauseDuration || t.totalIdleSeconds || 0), x: 169, w: 27 }
+        ];
+        drawRow(i, cells);
+      });
+      drawFooter();
+    } else if (activeReport === 'points') {
+      drawTableHeader(currentHeaders);
+      translators.forEach((t, i) => {
+        const cells = [
+          { text: t.name, x: 16, w: 60 },
+          { text: `Level ${t.level || 1}`, x: 76, w: 40 },
+          { text: `${t.points || 0} Poin`, x: 116, w: 40 },
+          { text: `${t.completedJobsCount} tugas`, x: 156, w: 40 }
+        ];
+        drawRow(i, cells);
+      });
+      drawFooter();
     }
 
     doc.save(filename);

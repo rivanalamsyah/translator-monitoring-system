@@ -410,8 +410,61 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
+  // HELPER: Validate working hours constraint
+  const checkWorkingHours = (): { valid: boolean; reason?: string } => {
+    const now = new Date();
+    const day = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    const timeFloat = hours + minutes / 60;
+
+    if (day === 0) {
+      return {
+        valid: false,
+        reason: 'Hari Minggu adalah hari libur operasional. Anda tidak dapat memulai atau melanjutkan pengerjaan task.',
+      };
+    }
+
+    if (day >= 1 && day <= 5) {
+      // Senin - Jumat: 08.00-12.00 dan 13.00-16.00 (istirahat 12.00-13.00)
+      if (timeFloat < 8.0 || timeFloat > 16.0) {
+        return {
+          valid: false,
+          reason: 'Di luar jam kerja operasional sistem (Senin - Jumat: 08:00 - 16:00).',
+        };
+      }
+      if (timeFloat >= 12.0 && timeFloat < 13.0) {
+        return {
+          valid: false,
+          reason: 'Saat ini waktu istirahat (12:00 - 13:00). Silakan melanjutkan pengerjaan setelah pukul 13:00.',
+        };
+      }
+    } else if (day === 6) {
+      // Sabtu: 08.00-14.00 (istirahat 12.00-13.00)
+      if (timeFloat < 8.0 || timeFloat > 14.0) {
+        return {
+          valid: false,
+          reason: 'Di luar jam kerja operasional sistem (Sabtu: 08:00 - 14:00).',
+        };
+      }
+      if (timeFloat >= 12.0 && timeFloat < 13.0) {
+        return {
+          valid: false,
+          reason: 'Saat ini waktu istirahat (12:00 - 13:00). Silakan melanjutkan pengerjaan setelah pukul 13:00.',
+        };
+      }
+    }
+
+    return { valid: true };
+  };
+
   // ACTION: Start Timer
   const startAssignmentTimer = async (taskId: string) => {
+    const timeCheck = checkWorkingHours();
+    if (!timeCheck.valid) {
+      showError('Batas Waktu Operasional', timeCheck.reason || 'Di luar jam kerja.');
+      return;
+    }
     const task = store.tasks.find((t) => t.id === taskId);
     if (!task) return;
 
@@ -504,6 +557,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   // ACTION: Resume Timer
   const resumeAssignmentTimer = async (taskId: string) => {
+    const timeCheck = checkWorkingHours();
+    if (!timeCheck.valid) {
+      showError('Batas Waktu Operasional', timeCheck.reason || 'Di luar jam kerja.');
+      return;
+    }
     const task = store.tasks.find((t) => t.id === taskId);
     if (!task) return;
 
