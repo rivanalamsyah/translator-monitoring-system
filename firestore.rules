@@ -62,7 +62,9 @@ service cloud.firestore {
       allow update: if isAdmin() || (
         isOwnProfile(profileId) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'status', 'avatarUrl', 'phone', 'languages', 'availability'
+          'status', 'avatarUrl', 'phone', 'languages', 'availability',
+          'currentLoadPoints', 'remainingCapacityPoints', 'utilizationPercentage',
+          'activeTaskId', 'activeAssignmentId'
         ])
       );
     }
