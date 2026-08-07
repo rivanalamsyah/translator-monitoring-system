@@ -95,8 +95,22 @@ const SYSTEM_SETTINGS = {
   }
 };
 
+interface SeedUser {
+  name: string;
+  email: string;
+  password: string;
+  role: string;
+  customClaimRole: string;
+  points?: number;
+  level?: number;
+  completedJobs?: number;
+  languages?: string[];
+  status?: string;
+  maxCapacityPoints?: number;
+}
+
 // 1 Admin + 15 Translators
-const USERS_TO_SEED = [
+const USERS_TO_SEED: SeedUser[] = [
   {
     name: 'Administrator',
     email: 'admin@example.com',
