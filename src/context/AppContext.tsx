@@ -245,6 +245,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             message: options.successMessage || 'Tindakan Anda telah berhasil diselesaikan.',
             showCancel: false,
             confirmText: 'Tutup',
+            onConfirm: undefined,
+            onCancel: undefined,
           });
         } catch (err: any) {
           console.error('[AppContext confirmAction Error]', err);
@@ -255,6 +257,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             message: err?.message || 'Terjadi kesalahan sistem saat memproses tindakan Anda.',
             showCancel: false,
             confirmText: 'Tutup',
+            onConfirm: undefined,
+            onCancel: undefined,
           });
         }
       },
