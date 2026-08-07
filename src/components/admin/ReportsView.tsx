@@ -11,20 +11,22 @@ import {
   Printer,
   Search,
   Calendar,
-  Languages,
+  Layers
 } from 'lucide-react';
 import { formatClock, formatDate } from '../../utils/formatters';
+import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
 
 export const ReportsView: React.FC = () => {
-  const { translators, assignments } = useApp();
+  const { translators, tasks } = useApp();
 
   const [activeReport, setActiveReport] = useState<'task' | 'translator' | 'productivity' | 'worktime' | 'points'>('task');
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState<'30days' | '7days' | 'all'>('30days');
 
-  // Filter tasks based on date range (simulated)
+  // Filter tasks based on date range and search query
   const filteredTasks = useMemo(() => {
-    return assignments.filter((task) => {
+    return tasks.filter((task) => {
       const matchSearch =
         task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         task.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -40,9 +42,9 @@ export const ReportsView: React.FC = () => {
       if (dateRange === '7days') return diffDays <= 7;
       return diffDays <= 30; // default 30 days
     });
-  }, [assignments, searchQuery, dateRange]);
+  }, [tasks, searchQuery, dateRange]);
 
-  // Grouped productivity stats (completed tasks grouped by date)
+  // Productivity stats (completed tasks grouped by date)
   const productivityData = useMemo(() => {
     const groups: Record<string, { date: string; count: number; pages: number; points: number }> = {};
     
@@ -55,261 +57,327 @@ export const ReportsView: React.FC = () => {
         }
         groups[dateStr].count += 1;
         groups[dateStr].pages += t.pageCount || 0;
-        groups[dateStr].points += t.calculatedPoints || 0;
+        groups[dateStr].points += t.rewardPoints || t.calculatedPoints || 0;
       });
 
     return Object.values(groups).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [filteredTasks]);
 
-  // Stats calculation
+  // Statistics calculation for KPIs
   const totalPages = useMemo(() => {
-    return assignments
-      .filter((a) => a.status === 'COMPLETED')
+    return tasks
+      .filter((t) => t.status === 'COMPLETED')
       .reduce((acc, curr) => acc + curr.pageCount, 0);
-  }, [assignments]);
+  }, [tasks]);
 
   const totalPoints = useMemo(() => {
-    return assignments
-      .filter((a) => a.status === 'COMPLETED')
-      .reduce((acc, curr) => acc + curr.calculatedPoints, 0);
-  }, [assignments]);
+    return tasks
+      .filter((t) => t.status === 'COMPLETED')
+      .reduce((acc, curr) => acc + (curr.rewardPoints || curr.calculatedPoints || 0), 0);
+  }, [tasks]);
 
   const avgWorkSecsPerPage = useMemo(() => {
-    const completed = assignments.filter((a) => a.status === 'COMPLETED' && a.totalWorkingSeconds > 0);
+    const completed = tasks.filter((t) => t.status === 'COMPLETED' && (t.effectiveWorkSeconds || t.totalWorkingSeconds || 0) > 0);
     if (completed.length === 0) return 0;
-    const totalSecs = completed.reduce((acc, a) => acc + a.totalWorkingSeconds, 0);
-    const totalPgs = completed.reduce((acc, a) => acc + a.pageCount, 0);
+    const totalSecs = completed.reduce((acc, t) => acc + (t.effectiveWorkSeconds || t.totalWorkingSeconds || 0), 0);
+    const totalPgs = completed.reduce((acc, t) => acc + t.pageCount, 0);
     return totalPgs > 0 ? Math.round(totalSecs / totalPgs) : 0;
-  }, [assignments]);
+  }, [tasks]);
 
-  // CSV Export Handler
-  const handleExportCSV = () => {
-    let headers: string[] = [];
-    let rows: any[][] = [];
-    let filename = `laporan_${activeReport}_${Date.now()}.csv`;
+  // Excel Export Handler using SheetJS
+  const handleExportExcel = () => {
+    let sheetData: any[] = [];
+    let filename = `laporan_${activeReport}_${Date.now()}.xlsx`;
 
     if (activeReport === 'task') {
-      headers = ['Kode', 'Judul Dokumen', 'Klien', 'Penerjemah', 'Jumlah Halaman', 'Reward Poin', 'Waktu Kerja (Detik)', 'Status', 'Tanggal Mulai', 'Tanggal Selesai'];
-      rows = filteredTasks.map((t) => [
-        t.code,
-        t.title,
-        t.clientName,
-        t.translatorName || 'Belum Diklaim',
-        t.pageCount,
-        t.calculatedPoints,
-        t.totalWorkingSeconds || 0,
-        t.status,
-        t.startedAt ? formatDate(t.startedAt) : '-',
-        t.completedAt ? formatDate(t.completedAt) : '-',
-      ]);
+      sheetData = filteredTasks.map((t) => ({
+        Kode: t.code,
+        'Judul Dokumen': t.title,
+        Klien: t.clientName,
+        Penerjemah: t.translatorName || 'Belum Diklaim',
+        'Jumlah Halaman': t.pageCount,
+        'Reward Poin': t.rewardPoints || t.calculatedPoints,
+        'Waktu Kerja (detik)': t.effectiveWorkSeconds || t.totalWorkingSeconds || 0,
+        Status: t.status,
+        'Tanggal Mulai': t.startedAt ? formatDate(t.startedAt) : '-',
+        'Tanggal Selesai': t.completedAt ? formatDate(t.completedAt) : '-'
+      }));
     } else if (activeReport === 'translator') {
-      headers = ['Nama Penerjemah', 'Status Ketersediaan', 'Bahasa', 'Total Tugas Selesai', 'Beban Kapasitas Saat Ini (hlm)', 'Maks Kapasitas (hlm)', 'Rasio Utilisasi (%)'];
-      rows = translators.map((t) => [
-        t.name,
-        t.status,
-        t.languages.join('; '),
-        t.completedJobsCount,
-        t.currentLoadPoints,
-        t.maxCapacityPoints,
-        t.utilizationPercentage,
-      ]);
+      sheetData = translators.map((t) => ({
+        'Nama Penerjemah': t.name,
+        Status: t.status,
+        Bahasa: t.languages.join(', '),
+        'Tugas Selesai': t.completedJobsCount,
+        'Beban Kerja Saat Ini (Hlm)': t.currentLoadPoints,
+        'Kapasitas Maksimal (Hlm)': t.maxCapacityPoints,
+        'Rasio Utilisasi (%)': `${t.utilizationPercentage}%`
+      }));
     } else if (activeReport === 'productivity') {
-      headers = ['Tanggal Penyelesaian', 'Jumlah Tugas Selesai', 'Total Halaman Selesai', 'Total Poin Terkumpul'];
-      rows = productivityData.map((d) => [d.date, d.count, d.pages, d.points]);
+      sheetData = productivityData.map((d) => ({
+        Tanggal: d.date,
+        'Jumlah Tugas Selesai': d.count,
+        'Total Halaman': d.pages,
+        'Poin Didistribusikan': d.points
+      }));
     } else if (activeReport === 'worktime') {
-      headers = ['Kode Tugas', 'Judul Tugas', 'Penerjemah', 'Jumlah Halaman', 'Total Kerja (detik)', 'Total Jeda (detik)', 'Rerata Detik Per Halaman'];
-      rows = filteredTasks
+      sheetData = filteredTasks
         .filter((t) => t.status === 'COMPLETED')
-        .map((t) => [
-          t.code,
-          t.title,
-          t.translatorName || '-',
-          t.pageCount,
-          t.totalWorkingSeconds || 0,
-          t.totalIdleSeconds || 0,
-          t.pageCount > 0 ? Math.round((t.totalWorkingSeconds || 0) / t.pageCount) : 0,
-        ]);
+        .map((t) => ({
+          Kode: t.code,
+          'Judul Tugas': t.title,
+          Penerjemah: t.translatorName || '-',
+          Halaman: t.pageCount,
+          'Waktu Efektif (Detik)': t.effectiveWorkSeconds || t.totalWorkingSeconds || 0,
+          'Total Jeda (Detik)': t.totalPauseDuration || t.totalIdleSeconds || 0,
+          'Rerata Detik/Halaman': t.pageCount > 0 ? Math.round((t.effectiveWorkSeconds || t.totalWorkingSeconds || 0) / t.pageCount) : 0
+        }));
     } else if (activeReport === 'points') {
-      headers = ['Nama Penerjemah', 'Level', 'Poin Leaderboard', 'Total Tugas Selesai'];
-      rows = translators.map((t) => [
-        t.name,
-        t.level || 1,
-        t.points || 0,
-        t.completedJobsCount,
-      ]);
+      sheetData = translators.map((t) => ({
+        'Nama Penerjemah': t.name,
+        Level: t.level || 1,
+        'Skor Poin': t.points || 0,
+        'Tugas Diselesaikan': t.completedJobsCount
+      }));
     }
 
-    const csvContent = [
-      headers.join(','),
-      ...rows.map((row) => row.map((val) => `"${('' + val).replace(/"/g, '""')}"`).join(',')),
-    ].join('\n');
+    const worksheet = XLSX.utils.json_to_sheet(sheetData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Data Laporan');
+    XLSX.writeFile(workbook, filename);
+  };
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  // PDF Export Handler using jsPDF
+  const handleExportPDF = () => {
+    const doc = new jsPDF('p', 'mm', 'a4');
+    const filename = `laporan_${activeReport}_${Date.now()}.pdf`;
+
+    // Font setting
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.setTextColor(236, 72, 153); // Pink-500 Color
+    doc.text('Laporan Operasional TMS - Master Translate', 14, 15);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Kategori: Laporan ${activeReport.toUpperCase()} | Unduh: ${new Date().toLocaleDateString('id-ID')}`, 14, 22);
+    doc.text('---------------------------------------------------------------------------------------------------------------------------------', 14, 26);
+
+    let y = 35;
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(17, 24, 39);
+
+    if (activeReport === 'task') {
+      // Columns: Kode (20), Judul (60), Klien (30), Penerjemah (35), Halaman (15), Status (25)
+      doc.text('Kode', 14, y);
+      doc.text('Judul Dokumen', 34, y);
+      doc.text('Klien', 94, y);
+      doc.text('Penerjemah', 124, y);
+      doc.text('Hlm', 159, y);
+      doc.text('Status', 174, y);
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(51, 65, 85);
+      
+      filteredTasks.forEach((t) => {
+        y += 8;
+        if (y > 280) { doc.addPage(); y = 20; }
+        doc.text(t.code, 14, y);
+        doc.text(t.title.substring(0, 28), 34, y);
+        doc.text(t.clientName.substring(0, 14), 94, y);
+        doc.text((t.translatorName || 'Belum Klaim').substring(0, 16), 124, y);
+        doc.text(String(t.pageCount), 159, y);
+        doc.text(t.status, 174, y);
+      });
+    } else if (activeReport === 'translator') {
+      // Columns: Nama (50), Status (20), Bahasa (50), Selesai (20), Beban (20), Kapasitas (20)
+      doc.text('Nama Penerjemah', 14, y);
+      doc.text('Status', 64, y);
+      doc.text('Keahlian Bahasa', 84, y);
+      doc.text('Selesai', 134, y);
+      doc.text('Beban', 154, y);
+      doc.text('Maks', 174, y);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(51, 65, 85);
+
+      translators.forEach((t) => {
+        y += 8;
+        if (y > 280) { doc.addPage(); y = 20; }
+        doc.text(t.name.substring(0, 22), 14, y);
+        doc.text(t.status, 64, y);
+        doc.text(t.languages.join(', ').substring(0, 22), 84, y);
+        doc.text(String(t.completedJobsCount), 134, y);
+        doc.text(`${t.currentLoadPoints} hlm`, 154, y);
+        doc.text(`${t.maxCapacityPoints} hlm`, 174, y);
+      });
+    } else if (activeReport === 'productivity') {
+      // Columns: Tanggal (50), Tugas Selesai (40), Total Halaman (40), Poin Terkumpul (50)
+      doc.text('Tanggal', 14, y);
+      doc.text('Tugas Selesai', 64, y);
+      doc.text('Total Halaman', 104, y);
+      doc.text('Poin Terdistribusi', 144, y);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(51, 65, 85);
+
+      productivityData.forEach((d) => {
+        y += 8;
+        if (y > 280) { doc.addPage(); y = 20; }
+        doc.text(d.date, 14, y);
+        doc.text(`${d.count} tugas`, 64, y);
+        doc.text(`${d.pages} hlm`, 104, y);
+        doc.text(`${d.points} Pt`, 144, y);
+      });
+    } else if (activeReport === 'worktime') {
+      // Columns: Kode (20), Judul (50), Penerjemah (40), Halaman (15), Kerja (30), Jeda (30)
+      doc.text('Kode', 14, y);
+      doc.text('Judul Tugas', 34, y);
+      doc.text('Penerjemah', 84, y);
+      doc.text('Hlm', 124, y);
+      doc.text('Waktu Kerja', 139, y);
+      doc.text('Waktu Jeda', 169, y);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(51, 65, 85);
+
+      filteredTasks
+        .filter((t) => t.status === 'COMPLETED')
+        .forEach((t) => {
+          y += 8;
+          if (y > 280) { doc.addPage(); y = 20; }
+          doc.text(t.code, 14, y);
+          doc.text(t.title.substring(0, 24), 34, y);
+          doc.text((t.translatorName || '-').substring(0, 18), 84, y);
+          doc.text(String(t.pageCount), 124, y);
+          doc.text(formatClock(t.effectiveWorkSeconds || t.totalWorkingSeconds || 0), 139, y);
+          doc.text(formatClock(t.totalPauseDuration || t.totalIdleSeconds || 0), 169, y);
+        });
+    } else if (activeReport === 'points') {
+      // Columns: Penerjemah (60), Level (30), Poin Skor (50), Tugas Selesai (40)
+      doc.text('Nama Penerjemah', 14, y);
+      doc.text('Tingkat Level', 74, y);
+      doc.text('Skor Poin', 104, y);
+      doc.text('Tugas Selesai', 144, y);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      doc.setTextColor(51, 65, 85);
+
+      translators.forEach((t) => {
+        y += 8;
+        if (y > 280) { doc.addPage(); y = 20; }
+        doc.text(t.name, 14, y);
+        doc.text(`Level ${t.level || 1}`, 74, y);
+        doc.text(`${t.points || 0} Poin`, 104, y);
+        doc.text(`${t.completedJobsCount} tugas`, 144, y);
+      });
+    }
+
+    doc.save(filename);
   };
 
   return (
-    <div className="space-y-6 pb-8 print-container">
-      
-      {/* Dynamic Inline CSS for Print Optimization */}
-      <style>{`
-        @media print {
-          body {
-            background: white !important;
-            color: black !important;
-          }
-          aside, header, nav, footer, .no-print, button, select, input {
-            display: none !important;
-          }
-          main {
-            padding: 0 !important;
-            margin: 0 !important;
-          }
-          .print-header-only {
-            display: block !important;
-          }
-          .print-container {
-            width: 100% !important;
-            border: none !important;
-            box-shadow: none !important;
-            padding: 0 !important;
-          }
-          table {
-            border-collapse: collapse !important;
-            width: 100% !important;
-          }
-          th, td {
-            border: 1px solid #e2e8f0 !important;
-            padding: 8px !important;
-            text-align: left !important;
-          }
-        }
-        .print-header-only {
-          display: none;
-        }
-      `}</style>
-
-      {/* Simulated Print Only Header */}
-      <div className="print-header-only border-b-2 border-slate-800 pb-4 mb-6">
-        <h1 className="text-xl font-bold text-slate-800 text-center uppercase tracking-wider">
-          Laporan Operasional TMS - Master Translate
-        </h1>
-        <p className="text-xs text-center text-slate-400 mt-1">
-          Tanggal Unduh: {new Date().toLocaleDateString('id-ID', { dateStyle: 'full' })} | Diunduh Oleh: Admin Panel
-        </p>
-      </div>
-
-      {/* Header (Screen Only) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white rounded-xl p-6 border border-slate-200 shadow-xs no-print">
+    <div className="space-y-6">
+      {/* Header and Controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white rounded-2xl p-6 border border-[#F3E8F4] shadow-xs">
         <div>
-          <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-pink-600" />
-            <span>Laporan Operasional & Kinerja Penerjemah</span>
+          <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-pink-500" />
+            <span>Laporan Kinerja & Operasional</span>
           </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Ekspor data kinerja tugas, beban utilisasi penerjemah, waktu kerja efektif, dan akumulasi poin.
+            Unduh berkas Excel (SheetJS) dan dokumen PDF resmi untuk evaluasi operasional harian.
           </p>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
           <button
-            onClick={handleExportCSV}
-            className="flex items-center gap-1 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3.5 py-2 rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+            onClick={handleExportExcel}
+            className="flex items-center gap-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-4 py-2.5 rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
           >
-            <Download className="h-3.5 w-3.5" />
-            <span>Ekspor CSV</span>
+            <Download className="h-4 w-4 text-emerald-500" />
+            <span>Unduh Excel</span>
           </button>
           <button
-            onClick={() => window.print()}
-            className="flex items-center gap-1 bg-pink-600 hover:bg-pink-700 text-white px-3.5 py-2 rounded-lg text-xs font-bold shadow-md shadow-pink-600/10 transition-colors cursor-pointer"
+            onClick={handleExportPDF}
+            className="flex items-center gap-1.5 bg-pink-500 hover:bg-pink-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer hover:shadow-md"
           >
-            <Printer className="h-3.5 w-3.5" />
+            <Printer className="h-4 w-4" />
             <span>Cetak PDF</span>
           </button>
         </div>
       </div>
 
-      {/* Summary KPI Widgets */}
+      {/* KPI Cards widget */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs space-y-2">
-          <p className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Volume Terjemahan</p>
+        <div className="rounded-2xl border border-[#F3E8F4] bg-white p-5 shadow-xs space-y-2">
+          <p className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Volume Pekerjaan</p>
           <p className="text-2xl font-black text-slate-800 font-mono">{totalPages} hlm</p>
-          <p className="text-[10px] text-slate-400">Total halaman dokumen disetujui</p>
+          <p className="text-[10px] text-slate-400">Total halaman terjemahan yang disetujui</p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs space-y-2">
-          <p className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Total Reward Poin</p>
-          <p className="text-2xl font-black text-slate-800 font-mono">{totalPoints} pt</p>
-          <p className="text-[10px] text-slate-400">Poin terkumpul di leaderboard</p>
+        <div className="rounded-2xl border border-[#F3E8F4] bg-white p-5 shadow-xs space-y-2">
+          <p className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Total Skor Poin</p>
+          <p className="text-2xl font-black text-slate-800 font-mono">{totalPoints} Pt</p>
+          <p className="text-[10px] text-slate-400">Jumlah poin reward diberikan</p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs space-y-2">
-          <p className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Kecepatan Rata-rata</p>
+        <div className="rounded-2xl border border-[#F3E8F4] bg-white p-5 shadow-xs space-y-2">
+          <p className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider">Kecepatan Efektif</p>
           <p className="text-2xl font-black text-slate-800 font-mono">
             {avgWorkSecsPerPage > 0 ? `${Math.round(avgWorkSecsPerPage / 60)}` : '0'} mnt / hlm
           </p>
-          <p className="text-[10px] text-slate-400">Waktu kerja efektif per halaman</p>
+          <p className="text-[10px] text-slate-400">Waktu kerja rata-rata per halaman</p>
         </div>
       </div>
 
-      {/* Report Selector (Sub-tabs) - Screen Only */}
-      <div className="flex flex-wrap border-b border-slate-200 gap-1 no-print">
-        <button
-          onClick={() => setActiveReport('task')}
-          className={`py-3 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${activeReport === 'task' ? 'border-pink-500 text-pink-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-        >
-          <span className="flex items-center gap-1.5"><FileText className="h-3.5 w-3.5" /> Laporan Tugas</span>
-        </button>
-        <button
-          onClick={() => setActiveReport('translator')}
-          className={`py-3 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${activeReport === 'translator' ? 'border-pink-500 text-pink-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-        >
-          <span className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5" /> Laporan Penerjemah</span>
-        </button>
-        <button
-          onClick={() => setActiveReport('productivity')}
-          className={`py-3 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${activeReport === 'productivity' ? 'border-pink-500 text-pink-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-        >
-          <span className="flex items-center gap-1.5"><TrendingUp className="h-3.5 w-3.5" /> Produktivitas</span>
-        </button>
-        <button
-          onClick={() => setActiveReport('worktime')}
-          className={`py-3 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${activeReport === 'worktime' ? 'border-pink-500 text-pink-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-        >
-          <span className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Waktu Kerja</span>
-        </button>
-        <button
-          onClick={() => setActiveReport('points')}
-          className={`py-3 px-4 text-xs font-bold border-b-2 transition-all cursor-pointer ${activeReport === 'points' ? 'border-pink-500 text-pink-600' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
-        >
-          <span className="flex items-center gap-1.5"><Trophy className="h-3.5 w-3.5" /> Poin & Leaderboard</span>
-        </button>
+      {/* Report Types selector tabs */}
+      <div className="bg-white rounded-xl border border-[#F3E8F4] shadow-xs p-1 flex flex-wrap gap-1 w-full md:w-fit">
+        {[
+          { id: 'task', label: 'Laporan Task', icon: FileText },
+          { id: 'translator', label: 'Laporan Penerjemah', icon: Users },
+          { id: 'productivity', label: 'Produktivitas', icon: TrendingUp },
+          { id: 'worktime', label: 'Waktu Kerja', icon: Clock },
+          { id: 'points', label: 'Poin & Level', icon: Trophy }
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveReport(tab.id as any)}
+            className={`flex-1 md:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              activeReport === tab.id
+                ? 'bg-pink-500 text-white shadow-sm'
+                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
+            }`}
+          >
+            <tab.icon className="h-3.5 w-3.5" />
+            <span>{tab.label}</span>
+          </button>
+        ))}
       </div>
 
-      {/* Filter panel - Screen Only */}
-      <div className="flex flex-col sm:flex-row gap-3 items-center no-print">
+      {/* Filter criteria */}
+      <div className="flex flex-col sm:flex-row gap-3 items-center">
         <div className="relative flex-1 w-full">
-          <Search className="absolute left-3 top-3 h-3.5 w-3.5 text-slate-400" />
+          <Search className="absolute left-3.5 top-3.5 h-3.5 w-3.5 text-slate-400" />
           <input
             type="text"
-            placeholder="Cari kata kunci..."
+            placeholder="Cari kata kunci di laporan..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 py-2 text-xs font-medium text-slate-805 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-pink-500 focus:border-pink-500 transition-all"
+            className="w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 py-2.5 text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-pink-500 transition-all shadow-xs"
           />
         </div>
-        <div className="flex items-center gap-1.5 w-full sm:w-auto shrink-0 bg-white border border-slate-200 rounded-lg px-3 py-2">
-          <Calendar className="h-3.5 w-3.5 text-slate-400" />
+        <div className="flex items-center gap-1.5 w-full sm:w-auto shrink-0 bg-white border border-slate-200 rounded-xl px-3 py-2.5 shadow-xs">
+          <Calendar className="h-4 w-4 text-slate-400" />
           <select
             value={dateRange}
             onChange={(e) => setDateRange(e.target.value as any)}
-            className="text-xs font-semibold text-slate-700 bg-transparent focus:outline-none"
+            className="text-xs font-bold text-slate-700 bg-transparent focus:outline-none cursor-pointer"
           >
             <option value="30days">30 Hari Terakhir</option>
             <option value="7days">7 Hari Terakhir</option>
@@ -318,44 +386,42 @@ export const ReportsView: React.FC = () => {
         </div>
       </div>
 
-      {/* Render Dynamic Report Data Table */}
-      <div className="rounded-xl border border-slate-200 bg-white overflow-hidden shadow-xs">
+      {/* Render Table Data */}
+      <div className="rounded-2xl border border-[#F3E8F4] bg-white overflow-hidden shadow-xs">
         <div className="overflow-x-auto">
           {activeReport === 'task' && (
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
-                  <th className="py-3.5 px-4">Kode & Judul Tugas</th>
-                  <th className="py-3.5 px-3">Klien</th>
-                  <th className="py-3.5 px-3">Penerjemah</th>
-                  <th className="py-3.5 px-3 text-center">Halaman</th>
-                  <th className="py-3.5 px-3 text-center">Poin</th>
-                  <th className="py-3.5 px-3">Durasi Kerja</th>
-                  <th className="py-3.5 px-3">Status</th>
-                  <th className="py-3.5 px-3">Tanggal Selesai</th>
+                <tr className="border-b border-slate-100 bg-slate-50/50 text-slate-400 font-extrabold uppercase tracking-wider text-[9px]">
+                  <th className="py-4 px-5">Kode & Judul Tugas</th>
+                  <th className="py-4 px-3">Klien</th>
+                  <th className="py-4 px-3">Penerjemah</th>
+                  <th className="py-4 px-3 text-center">Halaman</th>
+                  <th className="py-4 px-3 text-center">Poin</th>
+                  <th className="py-4 px-3">Durasi</th>
+                  <th className="py-4 px-3">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700">
+              <tbody className="divide-y divide-slate-55 text-slate-700">
                 {filteredTasks.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-8 px-4 text-center text-slate-400">Tidak ada data tugas.</td>
+                    <td colSpan={7} className="py-8 px-5 text-center text-slate-400">Tidak ada data tugas.</td>
                   </tr>
                 ) : (
                   filteredTasks.map((t) => (
                     <tr key={t.id} className="hover:bg-slate-50/30 transition-colors">
-                      <td className="py-3.5 px-4 font-medium">
-                        <span className="font-mono text-[10px] font-bold text-pink-600 block">{t.code}</span>
+                      <td className="py-3.5 px-5 font-bold">
+                        <span className="font-mono text-[9px] text-pink-500 block">{t.code}</span>
                         <span className="truncate max-w-[200px] block">{t.title}</span>
                       </td>
                       <td className="py-3.5 px-3 text-slate-500">{t.clientName}</td>
                       <td className="py-3.5 px-3 font-semibold">{t.translatorName || 'Belum Diklaim'}</td>
                       <td className="py-3.5 px-3 text-center font-mono">{t.pageCount} hlm</td>
-                      <td className="py-3.5 px-3 text-center font-mono font-bold text-pink-600">{t.calculatedPoints} pt</td>
-                      <td className="py-3.5 px-3 font-mono">{formatClock(t.totalWorkingSeconds)}</td>
+                      <td className="py-3.5 px-3 text-center font-mono font-black text-pink-500">{t.rewardPoints || t.calculatedPoints} Pt</td>
+                      <td className="py-3.5 px-3 font-mono">{formatClock(t.effectiveWorkSeconds || t.totalWorkingSeconds || 0)}</td>
                       <td className="py-3.5 px-3">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-pink-50 text-pink-700 border border-pink-100">{t.status}</span>
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-pink-50 text-pink-600 border border-pink-100/50">{t.status}</span>
                       </td>
-                      <td className="py-3.5 px-3 text-slate-400 font-mono">{t.completedAt ? new Date(t.completedAt).toLocaleDateString('id-ID') : '-'}</td>
                     </tr>
                   ))
                 )}
@@ -366,26 +432,26 @@ export const ReportsView: React.FC = () => {
           {activeReport === 'translator' && (
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
-                  <th className="py-3.5 px-4">Nama Penerjemah</th>
-                  <th className="py-3.5 px-3">Status</th>
-                  <th className="py-3.5 px-3">Bahasa</th>
-                  <th className="py-3.5 px-3 text-center">Tugas Selesai</th>
-                  <th className="py-3.5 px-3 text-center">Beban Aktif</th>
-                  <th className="py-3.5 px-3 text-center">Maks Kapasitas</th>
-                  <th className="py-3.5 px-3 text-center">Utilisasi</th>
+                <tr className="border-b border-slate-100 bg-slate-50/50 text-slate-400 font-extrabold uppercase tracking-wider text-[9px]">
+                  <th className="py-4 px-5">Nama Penerjemah</th>
+                  <th className="py-4 px-3">Status</th>
+                  <th className="py-4 px-3">Keahlian Bahasa</th>
+                  <th className="py-4 px-3 text-center">Tugas Selesai</th>
+                  <th className="py-4 px-3 text-center">Beban Aktif</th>
+                  <th className="py-4 px-3 text-center">Maks Kapasitas</th>
+                  <th className="py-4 px-3 text-center">Utilisasi</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700">
+              <tbody className="divide-y divide-slate-55 text-slate-700">
                 {translators.map((tr) => (
                   <tr key={tr.id} className="hover:bg-slate-50/30 transition-colors">
-                    <td className="py-3.5 px-4 font-bold">{tr.name}</td>
-                    <td className="py-3.5 px-3 font-semibold text-slate-500">{tr.status}</td>
-                    <td className="py-3.5 px-3 text-slate-655 font-mono">{tr.languages.join(', ')}</td>
+                    <td className="py-3.5 px-5 font-bold">{tr.name}</td>
+                    <td className="py-3.5 px-3 font-semibold text-slate-550">{tr.status}</td>
+                    <td className="py-3.5 px-3 text-slate-500 font-mono">{tr.languages.join(', ')}</td>
                     <td className="py-3.5 px-3 text-center font-mono">{tr.completedJobsCount}</td>
                     <td className="py-3.5 px-3 text-center font-mono">{tr.currentLoadPoints} hlm</td>
                     <td className="py-3.5 px-3 text-center font-mono">{tr.maxCapacityPoints} hlm</td>
-                    <td className="py-3.5 px-3 text-center font-mono font-bold text-pink-600">{tr.utilizationPercentage}%</td>
+                    <td className="py-3.5 px-3 text-center font-mono font-black text-pink-500">{tr.utilizationPercentage}%</td>
                   </tr>
                 ))}
               </tbody>
@@ -395,25 +461,25 @@ export const ReportsView: React.FC = () => {
           {activeReport === 'productivity' && (
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
-                  <th className="py-3.5 px-4">Tanggal</th>
-                  <th className="py-3.5 px-3 text-center">Tugas Selesai</th>
-                  <th className="py-3.5 px-3 text-center">Total Halaman Diterjemahkan</th>
-                  <th className="py-3.5 px-3 text-center">Total Poin Diperoleh</th>
+                <tr className="border-b border-slate-100 bg-slate-50/50 text-slate-400 font-extrabold uppercase tracking-wider text-[9px]">
+                  <th className="py-4 px-5">Tanggal</th>
+                  <th className="py-4 px-3 text-center">Tugas Selesai</th>
+                  <th className="py-4 px-3 text-center">Total Halaman Diterjemahkan</th>
+                  <th className="py-4 px-3 text-center">Total Poin Diperoleh</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700">
+              <tbody className="divide-y divide-slate-55 text-slate-700">
                 {productivityData.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="py-8 px-4 text-center text-slate-400">Belum ada tugas diselesaikan pada periode ini.</td>
+                    <td colSpan={4} className="py-8 px-5 text-center text-slate-400">Belum ada tugas diselesaikan pada periode ini.</td>
                   </tr>
                 ) : (
                   productivityData.map((d) => (
                     <tr key={d.date} className="hover:bg-slate-50/30 transition-colors">
-                      <td className="py-3.5 px-4 font-medium">{d.date}</td>
+                      <td className="py-3.5 px-5 font-bold">{d.date}</td>
                       <td className="py-3.5 px-3 text-center font-mono">{d.count} tugas</td>
                       <td className="py-3.5 px-3 text-center font-mono">{d.pages} hlm</td>
-                      <td className="py-3.5 px-3 text-center font-mono font-bold text-pink-600">{d.points} pt</td>
+                      <td className="py-3.5 px-3 text-center font-mono font-black text-pink-500">{d.points} Pt</td>
                     </tr>
                   ))
                 )}
@@ -424,36 +490,36 @@ export const ReportsView: React.FC = () => {
           {activeReport === 'worktime' && (
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
-                  <th className="py-3.5 px-4">Kode & Judul Tugas</th>
-                  <th className="py-3.5 px-3">Penerjemah</th>
-                  <th className="py-3.5 px-3 text-center">Halaman</th>
-                  <th className="py-3.5 px-3">Total Jam Kerja</th>
-                  <th className="py-3.5 px-3">Total Sesi Jeda</th>
-                  <th className="py-3.5 px-3 text-center">Rata-rata Waktu/Halaman</th>
+                <tr className="border-b border-slate-100 bg-slate-50/50 text-slate-400 font-extrabold uppercase tracking-wider text-[9px]">
+                  <th className="py-4 px-5">Kode & Judul Tugas</th>
+                  <th className="py-4 px-3">Penerjemah</th>
+                  <th className="py-4 px-3 text-center">Halaman</th>
+                  <th className="py-4 px-3">Total Jam Kerja</th>
+                  <th className="py-4 px-3">Total Sesi Jeda</th>
+                  <th className="py-4 px-3 text-center">Rata-rata Waktu/Halaman</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700">
+              <tbody className="divide-y divide-slate-55 text-slate-700">
                 {filteredTasks.filter((t) => t.status === 'COMPLETED').length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-8 px-4 text-center text-slate-400">Belum ada data waktu kerja tugas diselesaikan.</td>
+                    <td colSpan={6} className="py-8 px-5 text-center text-slate-400">Belum ada data waktu kerja tugas diselesaikan.</td>
                   </tr>
                 ) : (
                   filteredTasks
                     .filter((t) => t.status === 'COMPLETED')
                     .map((t) => {
-                      const avgSecs = t.pageCount > 0 ? Math.round(t.totalWorkingSeconds / t.pageCount) : 0;
+                      const avgSecs = t.pageCount > 0 ? Math.round((t.effectiveWorkSeconds || t.totalWorkingSeconds || 0) / t.pageCount) : 0;
                       return (
                         <tr key={t.id} className="hover:bg-slate-50/30 transition-colors">
-                          <td className="py-3.5 px-4">
-                            <span className="font-mono text-[10px] font-bold text-pink-600 block">{t.code}</span>
+                          <td className="py-3.5 px-5">
+                            <span className="font-mono text-[9px] text-pink-500 block">{t.code}</span>
                             <span className="truncate max-w-[200px] block">{t.title}</span>
                           </td>
                           <td className="py-3.5 px-3 font-semibold">{t.translatorName || '-'}</td>
                           <td className="py-3.5 px-3 text-center font-mono">{t.pageCount} hlm</td>
-                          <td className="py-3.5 px-3 font-mono font-semibold">{formatClock(t.totalWorkingSeconds)}</td>
-                          <td className="py-3.5 px-3 font-mono text-slate-500">{formatClock(t.totalIdleSeconds)}</td>
-                          <td className="py-3.5 px-3 text-center font-mono font-bold text-pink-600">{Math.round(avgSecs / 60)} mnt/hlm</td>
+                          <td className="py-3.5 px-3 font-mono font-semibold">{formatClock(t.effectiveWorkSeconds || t.totalWorkingSeconds || 0)}</td>
+                          <td className="py-3.5 px-3 font-mono text-slate-500">{formatClock(t.totalPauseDuration || t.totalIdleSeconds || 0)}</td>
+                          <td className="py-3.5 px-3 text-center font-mono font-black text-pink-600">{Math.round(avgSecs / 60)} mnt/hlm</td>
                         </tr>
                       );
                     })
@@ -465,21 +531,19 @@ export const ReportsView: React.FC = () => {
           {activeReport === 'points' && (
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50 text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
-                  <th className="py-3.5 px-4">Nama Penerjemah</th>
-                  <th className="py-3.5 px-3 text-center">Level</th>
-                  <th className="py-3.5 px-3 text-center">Total XP</th>
-                  <th className="py-3.5 px-3 text-center">Total Poin Leaderboard</th>
-                  <th className="py-3.5 px-3 text-center">Jumlah Tugas Selesai</th>
+                <tr className="border-b border-slate-100 bg-slate-50/50 text-slate-400 font-extrabold uppercase tracking-wider text-[9px]">
+                  <th className="py-4 px-5">Nama Penerjemah</th>
+                  <th className="py-4 px-3 text-center">Level</th>
+                  <th className="py-4 px-3 text-center">Total Poin Leaderboard</th>
+                  <th className="py-4 px-3 text-center">Jumlah Tugas Selesai</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-slate-700">
+              <tbody className="divide-y divide-slate-55 text-slate-700">
                 {translators.map((tr) => (
                   <tr key={tr.id} className="hover:bg-slate-50/30 transition-colors">
-                    <td className="py-3.5 px-4 font-bold">{tr.name}</td>
+                    <td className="py-3.5 px-5 font-bold">{tr.name}</td>
                     <td className="py-3.5 px-3 text-center font-semibold text-slate-600">Level {tr.level || 1}</td>
-                    <td className="py-3.5 px-3 text-center font-mono">{tr.xp || 0} XP</td>
-                    <td className="py-3.5 px-3 text-center font-mono font-black text-pink-600">{tr.points || 0} pt</td>
+                    <td className="py-3.5 px-3 text-center font-mono font-black text-pink-600">{tr.points || 0} Pt</td>
                     <td className="py-3.5 px-3 text-center font-mono">{tr.completedJobsCount} tugas</td>
                   </tr>
                 ))}

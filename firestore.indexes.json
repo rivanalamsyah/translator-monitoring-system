@@ -1,7 +1,7 @@
 {
   "indexes": [
     {
-      "collectionGroup": "assignments",
+      "collectionGroup": "tasks",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "translatorId", "order": "ASCENDING" },
@@ -10,15 +10,15 @@
       ]
     },
     {
-      "collectionGroup": "timer_logs",
+      "collectionGroup": "taskTimers",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "assignmentId", "order": "ASCENDING" },
+        { "fieldPath": "taskId", "order": "ASCENDING" },
         { "fieldPath": "startTime", "order": "DESCENDING" }
       ]
     },
     {
-      "collectionGroup": "assignments",
+      "collectionGroup": "tasks",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "status", "order": "ASCENDING" },
@@ -30,11 +30,12 @@
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "userId", "order": "ASCENDING" },
+        { "fieldPath": "read", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
     },
     {
-      "collectionGroup": "assignments",
+      "collectionGroup": "tasks",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "translatorId", "order": "ASCENDING" },
@@ -42,7 +43,7 @@
       ]
     },
     {
-      "collectionGroup": "timer_logs",
+      "collectionGroup": "taskTimers",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "translatorId", "order": "ASCENDING" },
@@ -50,7 +51,7 @@
       ]
     },
     {
-      "collectionGroup": "claimable_tasks",
+      "collectionGroup": "tasks",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "status", "order": "ASCENDING" },
@@ -58,7 +59,7 @@
       ]
     },
     {
-      "collectionGroup": "claimable_tasks",
+      "collectionGroup": "tasks",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "claimedById", "order": "ASCENDING" },

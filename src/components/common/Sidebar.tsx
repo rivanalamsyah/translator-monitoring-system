@@ -45,7 +45,7 @@ function getSavedSidebarState(): boolean {
 }
 
 // ── Tooltip wrapper ───────────────────────────────────────────────────────────
-const Tooltip: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+const Tooltip = ({ label, children }: { label: string; children: React.ReactNode; key?: React.Key }) => (
   <div className="relative group/tip">
     {children}
     <div
@@ -132,8 +132,8 @@ export const Sidebar: React.FC = () => {
   // ── Nav items ──
   const adminNavItems: NavItem[] = [
     { id: 'dashboard',    label: 'Dashboard',             icon: LayoutDashboard },
-    { id: 'assignments',  label: 'Tugas',                 icon: FileText        },
-    { id: 'translators',  label: 'Penerjemah',            icon: Users           },
+    { id: 'assignments',  label: 'Task',                  icon: FileText        },
+    { id: 'translators',  label: 'Translator',            icon: Users           },
     { id: 'leaderboard',  label: 'Leaderboard',           icon: Trophy          },
     { id: 'reports',      label: 'Laporan',               icon: BarChart3       },
     { id: 'settings',     label: 'Pengaturan',            icon: Settings        },
@@ -141,7 +141,7 @@ export const Sidebar: React.FC = () => {
 
   const translatorNavItems: NavItem[] = [
     { id: 'dashboard',    label: 'Dashboard',                    icon: LayoutDashboard },
-    { id: 'tasks',        label: 'Tugas',                        icon: FileText        },
+    { id: 'tasks',        label: 'Task',                         icon: FileText        },
     { id: 'leaderboard',  label: 'Leaderboard',                  icon: Trophy          },
     { id: 'profile',      label: 'Profil',                       icon: User            },
   ];

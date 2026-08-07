@@ -12,18 +12,25 @@
     "test": "vitest",
     "test:watch": "vitest --watch",
     "ci": "vitest --reporter=dot --coverage && tsc --noEmit",
+    "seed": "npx tsx scripts/seedFirestore.ts",
     "emulators:start": "firebase emulators:start --only firestore,auth,functions,storage --project emulator-project"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.14",
     "@vitejs/plugin-react": "^5.0.4",
+    "@hookform/resolvers": "^3.9.0",
     "clsx": "^2.1.1",
     "firebase": "^12.17.0",
+    "jspdf": "^4.2.1",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
-    "tailwind-merge": "^3.6.0"
+    "react-hook-form": "^7.53.0",
+    "tailwind-merge": "^3.6.0",
+    "xlsx": "^0.18.5",
+    "zod": "^3.23.8",
+    "zustand": "^4.5.5"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.0.0",
@@ -31,6 +38,8 @@
     "@testing-library/user-event": "^14.5.2",
     "@types/jest": "^29.5.3",
     "@types/node": "^22.14.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
     "@vite-pwa/assets-generator": "^1.0.2",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",

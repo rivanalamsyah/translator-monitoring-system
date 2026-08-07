@@ -6,18 +6,14 @@ import { BottomNavigation } from './components/common/BottomNavigation';
 // Admin Components
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { TranslatorsList } from './components/admin/TranslatorsList';
-import { AssignmentsList } from './components/admin/AssignmentsList';
-import { TimerMonitoring } from './components/admin/TimerMonitoring';
-import { WorkloadOverview } from './components/admin/WorkloadOverview';
+import { TasksList } from './components/admin/TasksList';
 import { ReportsView } from './components/admin/ReportsView';
 import { SettingsView } from './components/admin/SettingsView';
 
 // Translator Components
 import { TranslatorDashboard } from './components/translator/TranslatorDashboard';
-import { MyAssignmentsView } from './components/translator/MyAssignmentsView';
-import { TranslatorHistoryView } from './components/translator/TranslatorHistoryView';
+import { TranslatorTasks } from './components/translator/TranslatorTasks';
 import { TranslatorProfileView } from './components/translator/TranslatorProfileView';
-import { ClaimableTasksView } from './components/translator/ClaimableTasksView';
 
 // Common Views
 import { LeaderboardView } from './components/common/LeaderboardView';
@@ -36,20 +32,17 @@ import { Login } from './components/common/Login';
 const MainLayout: React.FC = () => {
   const { currentRole, adminTab, translatorTab, currentUser } = useApp();
 
-  // Dynamic browser tab title based on navigation in Indonesian
+  // Dynamic browser tab title in Indonesian
   React.useEffect(() => {
     if (!currentUser) return;
     const tabNames: Record<string, string> = {
       dashboard: 'Dashboard',
       translators: 'Manajemen Penerjemah',
-      assignments: 'Daftar Tugas',
-      timers: 'Pemantau Waktu',
-      workload: 'Beban Kerja & Kapasitas',
+      assignments: 'Manajemen Task Pool',
       reports: 'Laporan Kinerja',
       settings: 'Pengaturan Sistem',
       leaderboard: 'Papan Peringkat',
-      tasks: 'Pool Task Tersedia',
-      history: 'Riwayat Kerja & Statistik',
+      tasks: 'Workspace Pengerjaan Task',
       profile: 'Profil & Kapasitas',
     };
 
@@ -69,11 +62,7 @@ const MainLayout: React.FC = () => {
       case 'translators':
         return <TranslatorsList />;
       case 'assignments':
-        return <AssignmentsList />;
-      case 'timers':
-        return <TimerMonitoring />;
-      case 'workload':
-        return <WorkloadOverview />;
+        return <TasksList />;
       case 'leaderboard':
         return <LeaderboardView />;
       case 'reports':
@@ -90,13 +79,9 @@ const MainLayout: React.FC = () => {
       case 'dashboard':
         return <TranslatorDashboard />;
       case 'tasks':
-        return <ClaimableTasksView />;
-      case 'assignments':
-        return <MyAssignmentsView />;
+        return <TranslatorTasks />;
       case 'leaderboard':
         return <LeaderboardView />;
-      case 'history':
-        return <TranslatorHistoryView />;
       case 'profile':
         return <TranslatorProfileView />;
       default:
@@ -105,10 +90,9 @@ const MainLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-800 transition-colors font-sans antialiased flex">
+    <div className="min-h-screen bg-[#FFFDFE] text-slate-800 transition-colors font-sans antialiased flex">
       <Sidebar />
       <main className="flex-1 min-w-0 overflow-x-hidden pb-20 md:pb-0">
-        {/* pt-14 on mobile = clear the fixed h-14 topbar; no padding on md+ */}
         <div className="pt-14 md:pt-0">
           <div className="p-4 md:p-6 lg:p-8 max-w-7xl mx-auto w-full">
             {currentRole === 'ADMIN' ? renderAdminTab() : renderTranslatorTab()}

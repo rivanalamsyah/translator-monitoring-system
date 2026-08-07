@@ -1,54 +1,73 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import { useApp } from '../../context/AppContext';
-import { X, FileText, Link } from 'lucide-react';
+import { X, FileText, Link as LinkIcon, AlertTriangle } from 'lucide-react';
+
+const newAssignmentSchema = z.object({
+  title: z.string().min(1, 'Judul dokumen harus diisi'),
+  clientName: z.string().optional(),
+  pageCount: z.number({ invalid_type_error: 'Harus berupa angka' }).min(1, 'Jumlah halaman minimal 1').max(500, 'Jumlah halaman maksimal 500'),
+  languageFrom: z.string().min(1, 'Pasangan bahasa harus dipilih'),
+  difficulty: z.enum(['EASY', 'MEDIUM', 'HARD']),
+  sourceFileUrl: z.union([
+    z.string().url('Tautan harus berupa URL yang valid (http/https)'),
+    z.string().length(0)
+  ]).optional(),
+  status: z.enum(['AVAILABLE', 'DRAFT']),
+});
+
+type NewAssignmentForm = z.infer<typeof newAssignmentSchema>;
 
 export const NewAssignmentModal: React.FC = () => {
   const {
     isNewAssignmentModalOpen,
     setIsNewAssignmentModalOpen,
     createAssignment,
-    translators,
     settings,
   } = useApp();
 
-  const [title, setTitle] = useState('');
-  const [clientName, setClientName] = useState('');
-  const [pageCount, setPageCount] = useState<number>(10);
-  const [selectedLangRule, setSelectedLangRule] = useState(settings.languageRules[0]);
-  const [difficulty, setDifficulty] = useState<'EASY' | 'MEDIUM' | 'HARD'>('MEDIUM');
-  const [sourceFileUrl, setSourceFileUrl] = useState('');
-  const [status, setStatus] = useState<'DRAFT' | 'AVAILABLE'>('AVAILABLE');
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<NewAssignmentForm>({
+    resolver: zodResolver(newAssignmentSchema),
+    defaultValues: {
+      title: '',
+      clientName: '',
+      pageCount: 10,
+      languageFrom: settings.languageRules[0]?.languageCode || '',
+      difficulty: 'MEDIUM',
+      sourceFileUrl: '',
+      status: 'AVAILABLE',
+    },
+  });
 
   if (!isNewAssignmentModalOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim()) return;
-
+  const onSubmit = (data: NewAssignmentForm) => {
     const deadlineAt = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
 
     createAssignment({
-      title,
-      clientName: clientName || 'Klien Umum',
+      title: data.title,
+      clientName: data.clientName || 'Klien Umum',
       documentType: 'General',
-      pageCount,
-      languageFrom: selectedLangRule.languageCode,
+      pageCount: data.pageCount,
+      languageFrom: data.languageFrom,
       languageTo: 'Indonesia',
       priority: 'MEDIUM',
-      sourceFileName: sourceFileUrl ? 'Tautan Dokumen Google Drive' : 'Dokumen_Sumber.pdf',
-      sourceFileUrl: sourceFileUrl || '#',
+      sourceFileName: data.sourceFileUrl ? 'Tautan Dokumen Google Drive' : 'Dokumen_Sumber.pdf',
+      sourceFileUrl: data.sourceFileUrl || '#',
       deadlineAt,
-      difficulty,
-      status: status === 'AVAILABLE' ? 'UNASSIGNED' : 'DRAFT', // map AVAILABLE to UNASSIGNED and DRAFT directly
+      difficulty: data.difficulty,
+      status: data.status === 'AVAILABLE' ? 'WAITING_CLAIM' : 'DRAFT', // Fix: map to WAITING_CLAIM
     } as any);
 
     // Reset & close
-    setTitle('');
-    setClientName('');
-    setPageCount(10);
-    setSourceFileUrl('');
-    setDifficulty('MEDIUM');
-    setStatus('AVAILABLE');
+    reset();
     setIsNewAssignmentModalOpen(false);
   };
 
@@ -76,8 +95,24 @@ export const NewAssignmentModal: React.FC = () => {
         </div>
 
         {/* Scrollable Form */}
-        <form onSubmit={handleSubmit} className="flex-1 flex flex-col overflow-hidden">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex-1 flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            
+            {/* Display errors if any */}
+            {Object.keys(errors).length > 0 && (
+              <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-xs text-rose-600 space-y-1">
+                <p className="font-bold flex items-center gap-1">
+                  <AlertTriangle className="h-4 w-4 text-rose-500" />
+                  Harap perbaiki kesalahan berikut:
+                </p>
+                <ul className="list-disc list-inside">
+                  {Object.values(errors).map((err, index) => (
+                    <li key={index}>{err?.message}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-slate-700">
               
               {/* Title */}
@@ -85,26 +120,27 @@ export const NewAssignmentModal: React.FC = () => {
                 <label className="text-xs font-semibold text-slate-600">Judul Dokumen *</label>
                 <input
                   type="text"
-                  required
                   placeholder="contoh: Perjanjian Hukum M&A Lintas Batas"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-850 placeholder-slate-400 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/50 transition-colors"
+                  {...register('title')}
+                  className={`w-full rounded-lg border bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-850 placeholder-slate-400 focus:outline-none focus:ring-1 transition-colors ${
+                    errors.title ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-500/50' : 'border-slate-200 focus:border-pink-500 focus:ring-pink-500/50'
+                  }`}
                 />
               </div>
 
-              {/* Document Link (GDrive) */}
+              {/* Document Link */}
               <div className="sm:col-span-2 space-y-1">
                 <label className="text-xs font-semibold text-slate-600 flex items-center gap-1">
-                  <Link className="h-3 w-3 text-pink-600" />
+                  <LinkIcon className="h-3 w-3 text-pink-600" />
                   Tautan Google Drive Dokumen
                 </label>
                 <input
-                  type="url"
+                  type="text"
                   placeholder="https://drive.google.com/..."
-                  value={sourceFileUrl}
-                  onChange={(e) => setSourceFileUrl(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-850 placeholder-slate-400 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/50 transition-colors"
+                  {...register('sourceFileUrl')}
+                  className={`w-full rounded-lg border bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-850 placeholder-slate-400 focus:outline-none focus:ring-1 transition-colors ${
+                    errors.sourceFileUrl ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-500/50' : 'border-slate-200 focus:border-pink-500 focus:ring-pink-500/50'
+                  }`}
                 />
               </div>
 
@@ -114,8 +150,7 @@ export const NewAssignmentModal: React.FC = () => {
                 <input
                   type="text"
                   placeholder="contoh: PT Telkom Indonesia Tbk"
-                  value={clientName}
-                  onChange={(e) => setClientName(e.target.value)}
+                  {...register('clientName')}
                   className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-850 placeholder-slate-400 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/50 transition-colors"
                 />
               </div>
@@ -124,11 +159,7 @@ export const NewAssignmentModal: React.FC = () => {
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-600">Pasangan Bahasa</label>
                 <select
-                  value={selectedLangRule.languageCode}
-                  onChange={(e) => {
-                    const rule = settings.languageRules.find((r) => r.languageCode === e.target.value);
-                    if (rule) setSelectedLangRule(rule);
-                  }}
+                  {...register('languageFrom')}
                   className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-750 focus:outline-none focus:border-pink-500 transition-colors"
                 >
                   {settings.languageRules.map((rule) => (
@@ -143,8 +174,7 @@ export const NewAssignmentModal: React.FC = () => {
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-600">Tingkat Kesulitan</label>
                 <select
-                  value={difficulty}
-                  onChange={(e) => setDifficulty(e.target.value as any)}
+                  {...register('difficulty')}
                   className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-750 focus:outline-none focus:border-pink-500 transition-colors"
                 >
                   <option value="EASY">Mudah</option>
@@ -158,11 +188,10 @@ export const NewAssignmentModal: React.FC = () => {
                 <label className="text-xs font-semibold text-slate-600">Jumlah Halaman</label>
                 <input
                   type="number"
-                  min="1"
-                  max="500"
-                  value={pageCount}
-                  onChange={(e) => setPageCount(parseInt(e.target.value) || 1)}
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-850 focus:outline-none focus:border-pink-500 focus:ring-1 focus:ring-pink-500/50 transition-colors"
+                  {...register('pageCount', { valueAsNumber: true })}
+                  className={`w-full rounded-lg border bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-850 focus:outline-none focus:ring-1 transition-colors ${
+                    errors.pageCount ? 'border-rose-300 focus:border-rose-500 focus:ring-rose-500/50' : 'border-slate-200 focus:border-pink-500 focus:ring-pink-500/50'
+                  }`}
                 />
               </div>
             </div>
@@ -173,8 +202,7 @@ export const NewAssignmentModal: React.FC = () => {
                 Status Tugas Saat Dibuat
               </label>
               <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as any)}
+                {...register('status')}
                 className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs font-medium text-slate-750 focus:outline-none focus:border-pink-500 transition-colors"
               >
                 <option value="AVAILABLE">Publikasikan Langsung ke Task Pool (Tersedia)</option>
@@ -187,7 +215,10 @@ export const NewAssignmentModal: React.FC = () => {
           <div className="shrink-0 flex items-center justify-end gap-3 p-4 border-t border-slate-100 bg-slate-50/50">
             <button
               type="button"
-              onClick={() => setIsNewAssignmentModalOpen(false)}
+              onClick={() => {
+                reset();
+                setIsNewAssignmentModalOpen(false);
+              }}
               className="rounded-lg border border-slate-200 px-4 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50 transition-colors cursor-pointer"
             >
               Batal

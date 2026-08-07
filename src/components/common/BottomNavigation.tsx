@@ -32,7 +32,7 @@ export const BottomNavigation: React.FC = () => {
   const [isMoreOpen, setIsMoreOpen] = useState(false);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
-  const availableCount = claimableTasks.filter((t) => t.status === 'AVAILABLE').length;
+  const availableCount = claimableTasks.filter((t) => t.status === 'WAITING_CLAIM').length;
 
   const handleAdminTabChange = (tab: string) => {
     setAdminTab(tab);
@@ -75,7 +75,7 @@ export const BottomNavigation: React.FC = () => {
               }`}
             >
               <FileText className="h-[20px] w-[20px] mb-0.5" />
-              <span className="text-[9px] font-bold">Tugas</span>
+              <span className="text-[9px] font-bold">Task</span>
             </button>
 
             {/* Customers (Translators) */}
@@ -86,7 +86,7 @@ export const BottomNavigation: React.FC = () => {
               }`}
             >
               <Users className="h-[20px] w-[20px] mb-0.5" />
-              <span className="text-[9px] font-bold">Penerjemah</span>
+              <span className="text-[9px] font-bold">Translator</span>
             </button>
 
             {/* Notifications */}
@@ -220,7 +220,7 @@ export const BottomNavigation: React.FC = () => {
               </span>
             )}
           </div>
-          <span className="text-[9px] font-bold">Tugas</span>
+          <span className="text-[9px] font-bold">Task</span>
         </button>
 
         {/* Leaderboard */}
@@ -231,7 +231,7 @@ export const BottomNavigation: React.FC = () => {
           }`}
         >
           <Trophy className="h-[20px] w-[20px] mb-0.5" />
-          <span className="text-[9px] font-bold">Papan Skor</span>
+          <span className="text-[9px] font-bold">Leaderboard</span>
         </button>
 
         {/* Profile / History */}

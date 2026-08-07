@@ -50,7 +50,7 @@ export function formatRelativeTime(isoString?: string): string {
   return `${diffDays}h yang lalu`;
 }
 
-export function getStatusTheme(status: TranslatorStatus | AssignmentStatus) {
+export function getStatusTheme(status: any) {
   switch (status) {
     case 'FREE':
       return {

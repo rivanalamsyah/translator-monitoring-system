@@ -22,6 +22,7 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    // Checks if the user profile matches their authenticated UID or translator profile ID
     function isOwnProfile(profileId) {
       return isAuthenticated() && (
         request.auth.uid == profileId ||
@@ -29,6 +30,7 @@ service cloud.firestore {
       );
     }
 
+    // Checks if the user is the translator assigned to the task
     function isAssignedTranslator(translatorId) {
       return isAuthenticated() && (
         request.auth.uid == translatorId ||
@@ -56,11 +58,11 @@ service cloud.firestore {
     match /translator_profiles/{profileId} {
       allow read: if isAuthenticated();
       allow create, delete: if isAdmin();
+      // Tighten security: prevent translators from updating points, level, and capacity details
       allow update: if isAdmin() || (
         isOwnProfile(profileId) &&
         request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'status', 'avatarUrl', 'phone', 'languages', 'availability',
-          'currentLoadPoints', 'remainingCapacityPoints', 'utilizationPercentage'
+          'status', 'avatarUrl', 'phone', 'languages', 'availability'
         ])
       );
     }
@@ -71,32 +73,67 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // ─── Assignments ────────────────────────────────────────
-    match /assignments/{assignmentId} {
-      allow read: if isAdmin() || isAssignedTranslator(resource.data.translatorId);
+    // ─── Tasks (Unified Tasks Pool & Work Tracker) ────────────
+    match /tasks/{taskId} {
+      // Translators can read available tasks to claim, or tasks assigned to them
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        resource.data.status == 'WAITING_CLAIM' ||
+        resource.data.status == 'AVAILABLE' ||
+        isAssignedTranslator(resource.data.translatorId) ||
+        isAssignedTranslator(resource.data.claimedById)
+      );
       allow create, delete: if isAdmin();
-      allow update: if isAdmin() || (
-        isAssignedTranslator(resource.data.translatorId) &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'status', 'startedAt', 'submittedAt', 'resultFileName', 'resultFileUrl',
-          'submissionNotes', 'totalWorkingSeconds', 'totalIdleSeconds',
-          'pauseCount', 'totalPauseDuration', 'effectiveWorkSeconds'
-        ]) &&
-        request.resource.data.status != 'COMPLETED' &&
-        request.resource.data.status != 'CANCELLED'
+      allow update: if isAuthenticated() && (
+        isAdmin() || (
+          isPenerjemah() && (
+            // Case 1: Claiming an available task
+            ((resource.data.status == 'WAITING_CLAIM' || resource.data.status == 'AVAILABLE') &&
+             request.resource.data.status == 'WORKING' &&
+             (request.resource.data.claimedById == request.auth.uid || request.resource.data.translatorId == request.auth.uid) &&
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+               'status', 'translatorId', 'translatorName', 'claimedById',
+               'claimedByName', 'claimedAt', 'startedAt'
+             ]))
+            ||
+            // Case 2: Pausing or resuming timer
+            ((resource.data.claimedById == request.auth.uid || resource.data.translatorId == request.auth.uid) &&
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+               'status', 'pausedAt', 'startedAt', 'effectiveWorkSeconds',
+               'totalWorkingSeconds', 'totalPauseDuration', 'totalIdleSeconds', 'pauseCount'
+             ]))
+            ||
+            // Case 3: Submitting result
+            ((resource.data.claimedById == request.auth.uid || resource.data.translatorId == request.auth.uid) &&
+             (resource.data.status == 'WORKING' || resource.data.status == 'REVISION' || resource.data.status == 'PAUSED') &&
+             request.resource.data.status == 'WAITING_REVIEW' &&
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+               'status', 'submittedAt', 'resultFileUrl', 'resultFileName', 'submissionNotes'
+             ]))
+          )
+        )
       );
     }
 
-    // ─── Timer Logs ─────────────────────────────────────────
-    match /timer_logs/{logId} {
-      allow read: if isAdmin() || isAssignedTranslator(resource.data.translatorId);
-      allow create: if isPenerjemah() && (
-        request.resource.data.translatorId == request.auth.uid ||
-        request.resource.data.translatorId == request.auth.token.translatorProfileId
+    // ─── Timer Logs (taskTimers) ─────────────────────────────
+    match /taskTimers/{logId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        isAssignedTranslator(resource.data.translatorId)
       );
-      allow update: if isAdmin() || (
-        isAssignedTranslator(resource.data.translatorId) &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['endTime', 'durationSeconds', 'reason'])
+      allow create: if isAuthenticated() && (
+        isAdmin() || (
+          isPenerjemah() && (
+            request.resource.data.translatorId == request.auth.uid ||
+            request.resource.data.translatorId == request.auth.token.translatorProfileId
+          )
+        )
+      );
+      allow update: if isAuthenticated() && (
+        isAdmin() || (
+          isAssignedTranslator(resource.data.translatorId) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['endTime', 'durationSeconds', 'reason'])
+        )
       );
       allow delete: if isAdmin();
     }
@@ -121,36 +158,11 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // ─── Activity Logs (write-once) ─────────────────────────
-    match /activity_logs/{logId} {
+    // ─── Activity Logs (taskHistory, write-once) ─────────────
+    match /taskHistory/{logId} {
       allow read: if isAdmin();
       allow create: if isAuthenticated();
       allow update, delete: if false;
-    }
-
-    // ─── Claimable Tasks ────────────────────────────────────
-    match /claimable_tasks/{taskId} {
-      allow read: if isAuthenticated();
-      allow create, delete: if isAdmin();
-      allow update: if isAdmin() || (
-        isPenerjemah() && (
-          // Case 1: Claiming an available task
-          (resource.data.status == 'AVAILABLE' &&
-           request.resource.data.status == 'WORKING' &&
-           request.resource.data.claimedById == request.auth.uid &&
-           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'claimedById', 'claimedByName', 'claimedAt', 'startedAt']))
-          ||
-          // Case 2: Pausing or resuming timer
-          (resource.data.claimedById == request.auth.uid &&
-           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'pausedAt', 'startedAt', 'effectiveWorkSeconds', 'totalPauseDuration', 'pauseCount']))
-          ||
-          // Case 3: Submitting result
-          (resource.data.claimedById == request.auth.uid &&
-           (resource.data.status == 'WORKING' || resource.data.status == 'REVISION' || resource.data.status == 'PAUSED') &&
-           request.resource.data.status == 'WAITING_REVIEW' &&
-           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'submittedAt', 'resultFileUrl', 'resultFileName', 'submissionNotes']))
-        )
-      );
     }
 
     // ─── Reward Point History (immutable) ───────────────────

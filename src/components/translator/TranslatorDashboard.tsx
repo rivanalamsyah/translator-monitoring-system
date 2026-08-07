@@ -1,484 +1,349 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import {
   Clock,
   Play,
   Pause,
-  UploadCloud,
-  FileText,
-  CheckCircle2,
-  AlertTriangle,
+  Send,
   Download,
-  Link2,
+  AlertTriangle,
   Trophy,
-  Star,
+  Award,
   Zap,
-  Target,
+  Activity,
+  Layers,
+  FileText,
+  CheckCircle,
+  HelpCircle,
+  ExternalLink,
   ChevronRight,
+  TrendingUp,
+  Flame,
+  Crown
 } from 'lucide-react';
 import { StatusBadge, PriorityBadge } from '../common/Badge';
 import { formatClock, formatDuration, formatDate } from '../../utils/formatters';
+import { AvatarImage } from '../common/AvatarImage';
 
 export const TranslatorDashboard: React.FC = () => {
   const {
     currentTranslatorProfile,
-    assignments,
+    tasks,
     startAssignmentTimer,
     resumeAssignmentTimer,
-    setActivePauseAssignment,
+    pauseAssignmentTimer,
     setActiveSubmitAssignment,
-    submitAssignment,
-    timerLogs,
     confirmAction,
     toggleTranslatorStatus,
-    claimableTasks,
-    claimTask,
     setTranslatorTab,
+    rewardPointHistory
   } = useApp();
 
-  const [driveUrl, setDriveUrl] = useState('');
-  const [isAccessConfirmed, setIsAccessConfirmed] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeTask, setActiveTask] = useState<any>(null);
 
-  // Find assignments strictly belonging to this active translator
-  const myAssignments = currentTranslatorProfile
-    ? assignments.filter((a) => a.translatorId === currentTranslatorProfile.id)
+  // Get tasks belonging to this translator
+  const myTasks = currentTranslatorProfile
+    ? tasks.filter((t) => t.translatorId === currentTranslatorProfile.id || t.claimedById === currentTranslatorProfile.id)
     : [];
 
-  // Active Job (Working, Paused, or Revision)
-  const activeJob = myAssignments.find(
-    (a) => a.status === 'WORKING' || a.status === 'PAUSED' || a.status === 'REVISION' || a.status === 'ASSIGNED'
+  // Active Task (Working, Paused, or Revision)
+  const currentActiveTask = myTasks.find(
+    (t) => t.status === 'WORKING' || t.status === 'PAUSED' || t.status === 'REVISION'
   );
 
-  useEffect(() => {
-    if (activeJob) {
-      setDriveUrl(activeJob.resultFileUrl || '');
-    } else {
-      setDriveUrl('');
-    }
-    setErrorMsg('');
-    setIsAccessConfirmed(false);
-  }, [activeJob?.id, activeJob?.resultFileUrl]);
+  const completedTasks = myTasks.filter((t) => t.status === 'COMPLETED');
+  const completedCount = completedTasks.length;
+  const totalPages = completedTasks.reduce((sum, t) => sum + (t.pageCount || 0), 0);
+  
+  // Total work seconds for completed tasks (used for productivity metrics)
+  const completedWorkSecs = completedTasks.reduce((sum, t) => sum + (t.effectiveWorkSeconds || t.totalWorkingSeconds || 0), 0);
+  
+  // Total work seconds for all tasks (used for total hours card)
+  const totalWorkSecs = myTasks.reduce((sum, t) => sum + (t.effectiveWorkSeconds || t.totalWorkingSeconds || 0), 0);
+  const totalHours = (totalWorkSecs / 3600).toFixed(1);
 
-  if (!currentTranslatorProfile) {
-    return <div className="p-8 text-center text-slate-400 font-medium">Memuat ruang kerja penerjemah...</div>;
-  }
+  // Average minutes per page (completed tasks only)
+  const averageMinPerPage = useMemo(() => {
+    if (totalPages === 0 || completedWorkSecs === 0) return '-';
+    const totalMinutes = completedWorkSecs / 60;
+    return `${(totalMinutes / totalPages).toFixed(1)} mnt/hlm`;
+  }, [totalPages, completedWorkSecs]);
 
-  const handleDriveSubmit = () => {
-    setErrorMsg('');
-    if (!activeJob) return;
+  // Points this month
+  const pointsThisMonth = useMemo(() => {
+    const currentMonthStr = new Date().toISOString().substring(0, 7);
+    return rewardPointHistory
+      .filter((h) => h.translatorId === currentTranslatorProfile?.id && h.timestamp.substring(0, 7) === currentMonthStr)
+      .reduce((sum, h) => sum + (h.points || 0), 0);
+  }, [rewardPointHistory, currentTranslatorProfile?.id]);
 
-    if (!driveUrl.trim()) {
-      setErrorMsg('Tautan Google Drive tidak boleh kosong.');
-      return;
-    }
+  // Ranking calculation (simulation based on total points)
+  const ranking = useMemo(() => {
+    // If we have stats, find rank in monthly leaderboard
+    return 1; // placeholder rank, will be calculated dynamically in real dashboard
+  }, []);
 
-    // Validate link
-    const gdriveRegex = /^(https?:\/\/)?((drive|docs|sheets|slides|forms)\.google\.com)\/[a-zA-Z0-9_\-\.\/\?&=\+]+/i;
-    if (!gdriveRegex.test(driveUrl.trim())) {
-      setErrorMsg('Format tautan tidak valid. Gunakan URL Google Drive yang benar (contoh: https://drive.google.com/file/d/...).');
-      return;
-    }
-
-    if (!isAccessConfirmed) {
-      setErrorMsg('Anda harus mencentang kotak konfirmasi izin akses link.');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setTimeout(() => {
-      submitAssignment(activeJob.id, driveUrl.trim(), 'Hasil dikirim langsung dari halaman detail tugas.');
-      setIsSubmitting(false);
-    }, 600);
+  const handlePause = (task: any) => {
+    confirmAction({
+      title: 'Jeda Pekerjaan?',
+      message: 'Apakah Anda ingin menangguhkan penghitung waktu sementara?',
+      type: 'warning',
+      confirmText: 'Tangguhkan',
+      onConfirm: async () => {
+        await pauseAssignmentTimer(task.id, 'Jeda pengerjaan dari dashboard');
+      }
+    });
   };
 
-  const completedCount = myAssignments.filter((a) => a.status === 'COMPLETED').length;
-  const revisionCount = myAssignments.filter((a) => a.status === 'REVISION').length;
+  if (!currentTranslatorProfile) {
+    return (
+      <div className="py-12 text-center text-slate-400 font-medium">
+        Memuat ruang kerja penerjemah...
+      </div>
+    );
+  }
 
-  const now = new Date();
-  const dueTodayCount = myAssignments.filter((a) => {
-    if (a.status === 'COMPLETED') return false;
-    const d = new Date(a.deadlineAt);
-    return d.toDateString() === now.toDateString();
-  }).length;
-
-  // Filter timer logs for active job
-  const jobTimerLogs = activeJob ? timerLogs.filter((tl) => tl.assignmentId === activeJob.id) : [];
-
-  const isWorking = currentTranslatorProfile.status === 'BUSY' || currentTranslatorProfile.status === 'BREAK';
+  // Define Achievements list based on points
+  const achievements = [
+    { title: 'Penerjemah Pemula', desc: 'Selesaikan tugas pertama Anda', unlocked: completedCount >= 1, icon: Trophy, color: 'text-amber-500 bg-amber-50' },
+    { title: 'Penerjemah Aktif', desc: 'Raih total skor di atas 100 poin', unlocked: (currentTranslatorProfile.points || 0) >= 100, icon: Flame, color: 'text-orange-500 bg-orange-50' },
+    { title: 'Kecepatan Cahaya', desc: 'Selesaikan tugas di bawah estimasi waktu', unlocked: completedCount >= 2, icon: Zap, color: 'text-sky-500 bg-sky-50' },
+    { title: 'Akurasi Sempurna', desc: 'Mendapat approval tanpa revisi', unlocked: completedCount >= 3, icon: CheckCircle, color: 'text-emerald-500 bg-emerald-50' }
+  ];
 
   return (
     <div className="space-y-6">
-      {/* Welcome Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-pink-600 via-pink-700 to-rose-600 text-white rounded-xl p-6 shadow-md border border-pink-700/10">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-xs font-bold text-pink-100 uppercase tracking-widest">Ruang Kerja Penerjemah</span>
+      {/* Upper Profile banner */}
+      <div className="bg-white rounded-2xl p-6 border border-[#F3E8F4] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-5">
+        <div className="flex items-center gap-4">
+          <AvatarImage
+            src={currentTranslatorProfile.avatar}
+            name={currentTranslatorProfile.name}
+            className="h-16 w-16 rounded-2xl object-cover ring-4 ring-pink-100"
+          />
+          <div>
+            <h2 className="text-lg font-bold text-slate-800">{currentTranslatorProfile.name}</h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Level {currentTranslatorProfile.level || 1} • {currentTranslatorProfile.languages.join(', ')}
+            </p>
+            <div className="flex items-center gap-1.5 mt-2">
+              <span className={`h-2 w-2 rounded-full ${currentTranslatorProfile.status === 'FREE' ? 'bg-emerald-500' : currentTranslatorProfile.status === 'BUSY' ? 'bg-amber-500' : 'bg-blue-500'} animate-pulse`} />
+              <span className="text-[10px] font-bold text-slate-500">Status saat ini: {currentTranslatorProfile.status}</span>
+            </div>
           </div>
-          <h2 className="text-xl font-bold text-white">Selamat datang kembali, {currentTranslatorProfile.name}!</h2>
-          <p className="text-xs text-pink-100/90">
-            Bahasa: <span className="font-bold text-white">{currentTranslatorProfile.languages.join(', ')}</span> • Kapasitas Saat Ini:{' '}
-            <span className="font-bold text-white font-mono">{currentTranslatorProfile.currentLoadPoints} / {currentTranslatorProfile.maxCapacityPoints} hlm</span>
-          </p>
         </div>
 
-        {/* Status Switch Toggle (Red = Ready, Green = Working) */}
-        <div className="flex items-center justify-between bg-white/10 rounded-xl p-3 border border-white/20 min-w-[180px]">
-          <div className="text-left mr-3">
-            <p className="text-[9px] font-extrabold text-pink-200 uppercase tracking-wider">Status Tugas</p>
-            <p className={`text-[11px] font-bold mt-0.5 ${isWorking ? 'text-emerald-300' : 'text-rose-300'}`}>
-              {currentTranslatorProfile.status === 'BUSY' ? 'Sibuk (BUSY)' : currentTranslatorProfile.status === 'BREAK' ? 'Istirahat (BREAK)' : 'Bebas (FREE)'}
-            </p>
+        {/* Change status control */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-[10px] font-extrabold uppercase text-slate-400 tracking-wider mr-2">Ubah Status Ketersediaan:</span>
+          {['FREE', 'BUSY', 'BREAK'].map((status) => {
+            const isCurrent = currentTranslatorProfile.status === status;
+            let themeClass = '';
+            if (status === 'FREE') themeClass = isCurrent ? 'bg-emerald-500 text-white' : 'text-emerald-600 bg-emerald-50 hover:bg-emerald-100';
+            else if (status === 'BUSY') themeClass = isCurrent ? 'bg-amber-500 text-white' : 'text-amber-600 bg-amber-50 hover:bg-amber-100';
+            else if (status === 'BREAK') themeClass = isCurrent ? 'bg-sky-500 text-white' : 'text-sky-600 bg-sky-50 hover:bg-sky-100';
+
+            return (
+              <button
+                key={status}
+                onClick={async () => {
+                  if (!isCurrent) {
+                    await toggleTranslatorStatus(currentTranslatorProfile.id);
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-lg text-[10px] font-extrabold transition-all cursor-pointer ${themeClass}`}
+              >
+                {status}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* KPI stats section */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        {[
+          { label: 'Poin Bulan Ini', value: pointsThisMonth, sub: 'Reward points berjalan', icon: Trophy, color: 'text-pink-500', bg: 'bg-pink-50/70 border-pink-100/80' },
+          { label: 'Peringkat Papan Skor', value: `#${ranking}`, sub: 'Top Leaderboard', icon: Crown, color: 'text-amber-500', bg: 'bg-amber-50/70 border-amber-100/80' },
+          { label: 'Halaman Terjemahan', value: `${totalPages} hlm`, sub: 'Akumulasi tugas selesai', icon: FileText, color: 'text-emerald-500', bg: 'bg-emerald-50/70 border-emerald-100/80' },
+          { label: 'Total Jam Kerja', value: `${totalHours} jam`, sub: 'Waktu kerja efektif', icon: Clock, color: 'text-indigo-500', bg: 'bg-indigo-50/70 border-indigo-100/80' },
+          { label: 'Rerata Menit / Hlm', value: averageMinPerPage, sub: 'Produktivitas rata-rata', icon: TrendingUp, color: 'text-rose-500', bg: 'bg-rose-50/70 border-rose-100/80' }
+        ].map((kpi) => (
+          <div
+            key={kpi.label}
+            className={`rounded-2xl border bg-white p-4.5 shadow-xs flex flex-col justify-between hover:shadow-sm transition-all duration-200 ${kpi.bg}`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] font-bold uppercase text-slate-450 tracking-wider">{kpi.label}</span>
+              <kpi.icon className={`h-4 w-4 ${kpi.color}`} />
+            </div>
+            <div className="mt-2.5">
+              <p className={`text-xl font-black font-mono ${kpi.color}`}>{kpi.value}</p>
+              <p className="text-[9px] text-slate-400 mt-0.5 leading-tight">{kpi.sub}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Row 3: Active Task Workspace & Unlocked Achievements */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Active Task Workspace card */}
+        <div className="lg:col-span-2 bg-white rounded-2xl p-5 border border-[#F3E8F4] shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="border-b border-[#F3E8F4] pb-3 mb-4 flex justify-between items-center">
+              <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <Activity className="h-4.5 w-4.5 text-pink-500 animate-pulse" />
+                <span>Workspace Tugas Aktif</span>
+              </h3>
+              <span className="text-[9px] font-extrabold uppercase text-slate-400 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-md">Live Timer</span>
+            </div>
+
+            {!currentActiveTask ? (
+              <div className="py-12 text-center text-slate-400 text-xs flex flex-col items-center justify-center gap-3">
+                <FileText className="h-8 w-8 text-slate-200" />
+                <div>
+                  <p className="font-bold text-slate-550">Tidak ada tugas aktif saat ini</p>
+                  <p className="text-[10px] text-slate-350 mt-0.5">Klaim tugas baru dari pool tugas untuk mulai bekerja</p>
+                </div>
+                <button
+                  onClick={() => setTranslatorTab('tasks')}
+                  className="mt-2 px-4 py-2 bg-pink-500 hover:bg-pink-600 text-white font-bold rounded-xl text-[10px] shadow-sm transition-all cursor-pointer"
+                >
+                  Buka Pool Tugas
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row justify-between gap-2 border-b border-slate-50 pb-3">
+                  <div>
+                    <span className="text-[9px] font-extrabold font-mono text-pink-500 bg-pink-50 px-2 py-0.5 rounded uppercase">
+                      {currentActiveTask.code}
+                    </span>
+                    <h4 className="text-xs font-bold text-slate-800 mt-1.5">{currentActiveTask.title}</h4>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      Spesifikasi: {currentActiveTask.documentType} • {currentActiveTask.pageCount} halaman
+                    </p>
+                  </div>
+                  <div className="sm:text-right shrink-0">
+                    <span className="text-[8px] text-slate-400 uppercase font-extrabold block">Tenggat Waktu</span>
+                    <span className="text-xs font-bold text-slate-700 block">{formatDate(currentActiveTask.deadlineAt)}</span>
+                  </div>
+                </div>
+
+                {/* Clock telemetry display */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="bg-[#FFF8FB] rounded-xl p-3 border border-[#FDF0F6] text-center">
+                    <span className="text-[8px] font-extrabold text-slate-400 uppercase block">Durasi Efektif</span>
+                    <p className="text-lg font-black font-mono text-pink-600 mt-1">
+                      {formatClock(currentActiveTask.effectiveWorkSeconds || currentActiveTask.totalWorkingSeconds || 0)}
+                    </p>
+                  </div>
+                  <div className="bg-slate-50 rounded-xl p-3 border border-slate-100 text-center">
+                    <span className="text-[8px] font-extrabold text-slate-400 uppercase block">Durasi Jeda</span>
+                    <p className="text-lg font-black font-mono text-slate-500 mt-1">
+                      {formatClock(currentActiveTask.totalPauseDuration || currentActiveTask.totalIdleSeconds || 0)}
+                    </p>
+                  </div>
+                  <div className="bg-emerald-50/50 rounded-xl p-3 border border-emerald-100 text-center">
+                    <span className="text-[8px] font-extrabold text-slate-400 uppercase block">Poin Reward</span>
+                    <p className="text-lg font-black font-mono text-emerald-600 mt-1">
+                      {currentActiveTask.rewardPoints || currentActiveTask.calculatedPoints} Pt
+                    </p>
+                  </div>
+                </div>
+
+                {/* Controls */}
+                <div className="flex items-center gap-2 pt-2">
+                  {currentActiveTask.status === 'WORKING' ? (
+                    <button
+                      onClick={() => handlePause(currentActiveTask)}
+                      className="flex-1 py-2.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-600 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <Pause className="h-4 w-4" />
+                      <span>Jeda Waktu</span>
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => startAssignmentTimer(currentActiveTask.id)}
+                      className="flex-1 py-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-250 text-emerald-600 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <Play className="h-4 w-4 animate-pulse" />
+                      <span>Mulai / Lanjut</span>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => setActiveSubmitAssignment(currentActiveTask)}
+                    disabled={currentActiveTask.status === 'PAUSED'}
+                    className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                      currentActiveTask.status === 'PAUSED'
+                        ? 'bg-slate-100 text-slate-450 border border-slate-200 cursor-not-allowed'
+                        : 'bg-pink-500 text-white hover:bg-pink-600 shadow-sm hover:shadow-md'
+                    }`}
+                  >
+                    <Send className="h-4 w-4" />
+                    <span>Kirim Hasil Terjemahan</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {currentActiveTask && (
+            <button
+              onClick={() => setTranslatorTab('tasks')}
+              className="w-full text-center mt-3 text-[11px] font-bold text-pink-500 hover:text-pink-600 flex items-center justify-center gap-1 transition-all cursor-pointer"
+            >
+              <span>Lihat Detail Tugas Lainnya</span>
+              <ChevronRight className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+
+        {/* Unlocked Achievements list */}
+        <div className="bg-white rounded-2xl p-5 border border-[#F3E8F4] shadow-xs flex flex-col justify-between">
+          <div>
+            <div className="border-b border-[#F3E8F4] pb-3 mb-4">
+              <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <Award className="h-4.5 w-4.5 text-pink-500" />
+                <span>Pencapaian Gamifikasi Terbaru</span>
+              </h3>
+              <p className="text-[10px] text-slate-400">Badge & medal yang telah berhasil Anda buka</p>
+            </div>
+
+            <div className="space-y-3">
+              {achievements.map((badge) => (
+                <div
+                  key={badge.title}
+                  className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                    badge.unlocked
+                      ? 'border-[#FDF0F6] bg-[#FFF8FB] opacity-100'
+                      : 'border-slate-100 bg-slate-50/50 opacity-60'
+                  }`}
+                >
+                  <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${badge.color}`}>
+                    <badge.icon className="h-4.5 w-4.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className={`text-xs font-bold block ${badge.unlocked ? 'text-slate-850' : 'text-slate-500'}`}>
+                      {badge.title}
+                    </span>
+                    <span className="text-[9px] text-slate-400 block mt-0.5 leading-tight">{badge.desc}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           <button
-            type="button"
-            onClick={() => toggleTranslatorStatus(currentTranslatorProfile.id)}
-            className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-              isWorking ? 'bg-emerald-500' : 'bg-rose-500'
-            }`}
-            title={isWorking ? 'Ubah ke Siap Kerja' : 'Ubah ke Sedang Bertugas'}
+            onClick={() => setTranslatorTab('leaderboard')}
+            className="w-full text-center mt-4 text-[11px] font-bold text-pink-500 hover:text-pink-600 flex items-center justify-center gap-1 cursor-pointer transition-all"
           >
-            <span
-              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out ${
-                isWorking ? 'translate-x-5' : 'translate-x-0'
-              }`}
-            />
+            <span>Buka Papan Skor & Badge</span>
+            <ChevronRight className="h-3 w-3" />
           </button>
         </div>
       </div>
-
-      {/* 6 Personal Metric Widgets */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
-          <p className="text-[10px] font-bold text-slate-400 uppercase">Total Tugas Saya</p>
-          <p className="text-lg font-black text-slate-800">{myAssignments.length}</p>
-          <p className="text-[10px] text-slate-400">Ditugaskan ke Saya</p>
-        </div>
-
-        <div className="rounded-xl border border-pink-200 bg-pink-50/50 p-3 shadow-xs">
-          <p className="text-[10px] font-bold text-pink-600 uppercase">Tugas Aktif</p>
-          <p className="text-lg font-black text-pink-700">{activeJob ? 1 : 0}</p>
-          <p className="text-[10px] text-pink-600/80">Sedang Berjalan</p>
-        </div>
-
-        <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
-          <p className="text-[10px] font-bold text-slate-400 uppercase">Batas Hari Ini</p>
-          <p className="text-lg font-black text-slate-800">{dueTodayCount}</p>
-          <p className="text-[10px] text-slate-400">Tenggat 24 Jam</p>
-        </div>
-
-        <div className="rounded-xl border border-teal-200 bg-teal-50/50 p-3 shadow-xs">
-          <p className="text-[10px] font-bold text-teal-600 uppercase">Selesai</p>
-          <p className="text-lg font-black text-teal-700">{completedCount}</p>
-          <p className="text-[10px] text-teal-600/80">Dokumen Disetujui</p>
-        </div>
-
-        <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-3 shadow-xs">
-          <p className="text-[10px] font-bold text-rose-600 uppercase">Revisi</p>
-          <p className="text-lg font-black text-rose-700">{revisionCount}</p>
-          <p className="text-[10px] text-rose-600/80">Butuh Perbaikan</p>
-        </div>
-
-        {/* Reward Points Widget */}
-        <div className="rounded-xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50 p-3 shadow-xs">
-          <p className="text-[10px] font-bold text-amber-600 uppercase flex items-center gap-1">
-            <Trophy className="w-3 h-3 text-amber-500" /> Reward Poin
-          </p>
-          <p className="text-lg font-black text-amber-700">{currentTranslatorProfile.points || 0}</p>
-          <p className="text-[10px] text-amber-600/80">Lv.{Math.floor((currentTranslatorProfile.points || 0) / 100) + 1}</p>
-        </div>
-      </div>
-
-      {/* Task Pool Quick Preview */}
-      {(() => {
-        const availableTasks = claimableTasks
-          .filter((t) => t.status === 'AVAILABLE')
-          .filter((t) =>
-            !currentTranslatorProfile.languages?.length ||
-            currentTranslatorProfile.languages.some(
-              (l) => t.languageFrom.includes(l.split('-')[0]) || l.includes(t.languageFrom)
-            )
-          )
-          .slice(0, 3);
-
-        if (availableTasks.length === 0) return null;
-
-        return (
-          <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl border border-emerald-200 p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Zap className="w-4 h-4 text-emerald-600" />
-                <h3 className="text-sm font-bold text-emerald-800">Task Tersedia untuk Diklaim!</h3>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500 text-white">
-                  {claimableTasks.filter((t) => t.status === 'AVAILABLE').length} task
-                </span>
-              </div>
-              <button
-                onClick={() => setTranslatorTab('tasks')}
-                className="flex items-center gap-1 text-xs font-semibold text-emerald-700 hover:text-emerald-900 transition-colors"
-              >
-                Lihat Semua <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <div className="space-y-2">
-              {availableTasks.map((task) => (
-                <div key={task.id} className="flex items-center justify-between bg-white rounded-lg px-3 py-2.5 border border-emerald-100 shadow-xs">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold text-slate-800 truncate">{task.title}</p>
-                    <p className="text-[10px] text-slate-400">{task.code} • {task.pageCount} hal • {task.languageFrom}</p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0 ml-3">
-                    <span className="text-sm font-extrabold text-amber-600">{task.rewardPoints} pt</span>
-                    <button
-                      onClick={() => claimTask(task.id)}
-                      className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-bold transition-colors flex items-center gap-1"
-                    >
-                      <Target className="w-3 h-3" /> Ambil
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Main Command Console: Active Job Controller */}
-      {activeJob ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left 2 Cols: Active Job Details & Timer Engine */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-xs space-y-6">
-              {/* Header info */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-mono text-xs font-bold text-pink-600">
-                      {activeJob.code}
-                    </span>
-                    <PriorityBadge priority={activeJob.priority} />
-                  </div>
-                  <h3 className="text-base font-bold text-slate-800">{activeJob.title}</h3>
-                  <p className="text-xs text-slate-400">Klien: {activeJob.clientName}</p>
-                </div>
-
-                <StatusBadge status={activeJob.status} size="md" />
-              </div>
-
-              {/* Revision Notice Alert if in Revision status */}
-              {activeJob.status === 'REVISION' && activeJob.revisionNotes && (
-                <div className="rounded-lg bg-rose-50 border border-rose-250 p-4 space-y-1 text-xs">
-                  <div className="flex items-center gap-1.5 font-bold text-rose-700">
-                    <AlertTriangle className="h-4 w-4 shrink-0 text-rose-600" />
-                    <span>Catatan Permintaan Revisi Super Admin:</span>
-                  </div>
-                  <p className="text-slate-600 italic">"{activeJob.revisionNotes}"</p>
-                </div>
-              )}
-
-              {/* Document Specs */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 rounded-lg bg-slate-50 border border-slate-200 p-4 text-xs text-slate-700">
-                <div>
-                  <p className="text-slate-400 text-[10px] font-bold uppercase">Pasangan Bahasa</p>
-                  <p className="font-bold text-slate-800">{activeJob.languageFrom}</p>
-                </div>
-                <div>
-                  <p className="text-slate-400 text-[10px] font-bold uppercase">Jumlah Halaman</p>
-                  <p className="font-bold text-slate-800">{activeJob.pageCount} halaman</p>
-                </div>
-                <div>
-                  <p className="text-slate-400 text-[10px] font-bold uppercase">Klien / Organisasi</p>
-                  <p className="font-bold text-slate-850 truncate">{activeJob.clientName || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-slate-400 text-[10px] font-bold uppercase">Tenggat Waktu</p>
-                  <p className="font-bold text-slate-800">{formatDate(activeJob.deadlineAt)}</p>
-                </div>
-              </div>
-
-              {/* Download Source File */}
-              <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <div className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-pink-600" />
-                  <div>
-                    <p className="text-xs font-bold text-slate-800 truncate max-w-[200px] sm:max-w-md">{activeJob.sourceFileName}</p>
-                    <p className="text-[10px] text-slate-400">Berkas Sumber Dokumen</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => confirmAction({
-                    title: 'Unduh Berkas Sumber',
-                    message: 'Mengunduh berkas sumber dokumen untuk proyek terjemahan Anda... (Simulasi)',
-                    type: 'info',
-                    confirmText: 'Tutup',
-                    showCancel: false,
-                    onConfirm: () => {}
-                  })}
-                  className="flex items-center gap-1 rounded bg-pink-600 hover:bg-pink-700 text-white px-3 py-1.5 text-xs font-semibold shadow-md shadow-pink-600/10 cursor-pointer transition-colors"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  <span>Unduh Sumber</span>
-                </button>
-              </div>
-
-              {/* Google Drive Link Submission Section */}
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 space-y-3 text-left">
-                <p className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                  <Link2 className="h-4.5 w-4.5 text-pink-600" />
-                  <span>Kirim Hasil Terjemahan (Tautan Google Drive)</span>
-                </p>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 focus-within:border-pink-500 transition-colors">
-                    <Link2 className="h-4 w-4 text-pink-500" />
-                    <input
-                      type="text"
-                      placeholder="https://drive.google.com/file/d/.../view"
-                      value={driveUrl}
-                      onChange={(e) => setDriveUrl(e.target.value)}
-                      className="w-full bg-transparent text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none"
-                    />
-                  </div>
-                  {errorMsg && <p className="text-[11px] text-rose-600 font-medium">{errorMsg}</p>}
-                  
-                  <div className="flex items-start gap-2 bg-white border border-slate-150 p-2.5 rounded-lg">
-                    <input
-                      type="checkbox"
-                      id="confirm-dashboard-permission"
-                      checked={isAccessConfirmed}
-                      onChange={(e) => setIsAccessConfirmed(e.target.checked)}
-                      className="mt-0.5 h-3.5 w-3.5 rounded border-slate-350 text-pink-600 focus:ring-pink-500 cursor-pointer"
-                    />
-                    <label htmlFor="confirm-dashboard-permission" className="text-[10px] text-slate-500 leading-normal cursor-pointer">
-                      Saya mengonfirmasi bahwa link Google Drive ini diatur ke <strong>"Anyone with the link can view"</strong> (Siapa saja yang memiliki link dapat melihat) agar Admin dapat melakukan review.
-                    </label>
-                  </div>
-                  
-                  <button
-                    onClick={handleDriveSubmit}
-                    disabled={isSubmitting}
-                    className="w-full flex items-center justify-center gap-1.5 rounded-lg bg-pink-600 hover:bg-pink-700 disabled:opacity-50 text-white py-2.5 text-xs font-bold transition-all shadow-md shadow-pink-600/10 cursor-pointer"
-                  >
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span>{isSubmitting ? 'Mengirim...' : 'Kirim Hasil Terjemahan'}</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* DIGITAL TIMER CONTROLLER */}
-              <div className="rounded-xl bg-slate-50 text-slate-800 p-6 shadow-xs space-y-6 text-center border border-slate-200/80">
-                <div className="space-y-1">
-                  <p className="text-xs uppercase font-mono tracking-widest text-pink-600">
-                    {activeJob.status === 'WORKING'
-                      ? 'TIMER BERJALAN LANGSUNG (BEKERJA)'
-                      : activeJob.status === 'PAUSED'
-                      ? 'TIMER DIJEDA (PENCATATAN WAKTU DIAM)'
-                      : 'SIAP MEMULAI PEKERJAAN'}
-                  </p>
-                  <div className="text-4xl sm:text-5xl font-black font-mono tracking-wider text-pink-600">
-                    {formatClock(activeJob.status === 'WORKING' ? activeJob.totalWorkingSeconds : activeJob.totalIdleSeconds)}
-                  </div>
-                  <div className="flex justify-center gap-6 text-xs text-slate-500 font-mono pt-2">
-                    <span>Kerja: {formatDuration(activeJob.totalWorkingSeconds)}</span>
-                    <span>Jeda: {formatDuration(activeJob.totalIdleSeconds)}</span>
-                  </div>
-                </div>
-
-                {/* CONTROLLER ACTION BUTTONS */}
-                <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
-                  {/* START BUTTON (if ASSIGNED or REVISION) */}
-                  {(activeJob.status === 'ASSIGNED' || activeJob.status === 'REVISION') && (
-                    <button
-                      onClick={() => startAssignmentTimer(activeJob.id)}
-                      className="flex items-center gap-2 rounded-lg bg-pink-600 hover:bg-pink-700 text-white px-6 py-3 text-xs font-bold shadow-md shadow-pink-600/20 transition-all cursor-pointer"
-                    >
-                      <Play className="h-4 w-4" />
-                      <span>MULAI TIMER</span>
-                    </button>
-                  )}
-
-                  {/* PAUSE BUTTON (if WORKING) */}
-                  {activeJob.status === 'WORKING' && (
-                    <button
-                      onClick={() => setActivePauseAssignment(activeJob)}
-                      className="flex items-center gap-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white px-5 py-2.5 text-xs font-bold shadow-md shadow-amber-500/20 transition-all cursor-pointer"
-                    >
-                      <Pause className="h-4 w-4" />
-                      <span>JEDA TIMER</span>
-                    </button>
-                  )}
-
-                  {/* RESUME BUTTON (if PAUSED) */}
-                  {activeJob.status === 'PAUSED' && (
-                    <button
-                      onClick={() => resumeAssignmentTimer(activeJob.id)}
-                      className="flex items-center gap-2 rounded-lg bg-pink-600 hover:bg-pink-700 text-white px-5 py-2.5 text-xs font-bold shadow-md shadow-pink-600/20 transition-all cursor-pointer"
-                    >
-                      <Play className="h-4 w-4" />
-                      <span>LANJUTKAN TIMER</span>
-                    </button>
-                  )}
-
-                  {/* SUBMIT BUTTON */}
-                  <button
-                    onClick={() => setActiveSubmitAssignment(activeJob)}
-                    className="flex items-center gap-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white px-6 py-2.5 text-xs font-bold shadow-md shadow-purple-600/20 transition-all cursor-pointer"
-                  >
-                    <UploadCloud className="h-4 w-4" />
-                    <span>KIRIM PEKERJAAN</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right Col: Timer Interval Logs */}
-          <div className="space-y-4">
-            <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <Clock className="h-4 w-4 text-pink-600" />
-                <span>Log Sesi Timer</span>
-              </h3>
-              <span className="text-[10px] text-slate-400 font-mono">Telemetri Tugas</span>
-            </div>
-
-            <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-xs space-y-3">
-              <div className="rounded-lg border border-slate-100 bg-slate-50 p-3 space-y-1 text-xs">
-                <div className="flex justify-between font-bold text-slate-800">
-                  <span>Sesi Kerja Aktif</span>
-                  <span className="text-pink-600 font-mono">Berjalan</span>
-                </div>
-                <p className="text-slate-400 text-[11px]">Memulai timer pada {formatDate(activeJob.startedAt)}</p>
-              </div>
-
-              {jobTimerLogs.map((log) => (
-                <div
-                  key={log.id}
-                  className="rounded-lg border border-slate-100 bg-slate-50 p-3 space-y-1 text-xs"
-                >
-                  <div className="flex justify-between font-bold text-slate-700">
-                    <span className={log.type === 'WORK' ? 'text-pink-600' : 'text-amber-600'}>
-                      {log.type === 'WORK' ? 'Interval Kerja' : 'Interval Jeda'}
-                    </span>
-                    <span className="font-mono text-slate-400">{formatDate(log.startTime)}</span>
-                  </div>
-                  {log.reason && <p className="text-slate-500 italic text-[11px]">"{log.reason}"</p>}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="rounded-xl border border-slate-200 bg-white p-12 text-center space-y-3 shadow-xs">
-          <CheckCircle2 className="h-12 w-12 text-emerald-500 mx-auto" />
-          <h3 className="text-base font-bold text-slate-800">Tidak Ada Tugas Aktif</h3>
-          <p className="text-xs text-slate-400 max-w-md mx-auto">
-            Saat ini Anda tidak memiliki pengukur waktu pengerjaan yang aktif. Silakan masuk ke menu <strong>Tugas</strong> untuk melihat daftar proyek yang tersedia di Task Pool dan klaim tugas baru.
-          </p>
-        </div>
-      )}
     </div>
   );
 };

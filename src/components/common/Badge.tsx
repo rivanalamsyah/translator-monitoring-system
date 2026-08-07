@@ -21,12 +21,12 @@ import {
 } from 'lucide-react';
 
 interface StatusBadgeProps {
-  status: TranslatorStatus | AssignmentStatus;
+  status: any;
   size?: 'sm' | 'md' | 'lg';
   showDot?: boolean;
 }
 
-function getStatusIcon(status: TranslatorStatus | AssignmentStatus, sizeClass: string) {
+function getStatusIcon(status: any, sizeClass: string) {
   switch (status) {
     case 'FREE':
       return <CircleCheck className={sizeClass} />;

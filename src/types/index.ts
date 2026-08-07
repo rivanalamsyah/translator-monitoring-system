@@ -6,9 +6,9 @@ export type TranslatorStatus =
   | 'BREAK'
   | 'OFFLINE';
 
-export type AssignmentStatus =
-  | 'UNASSIGNED'
-  | 'ASSIGNED'
+export type TaskStatus =
+  | 'DRAFT'
+  | 'WAITING_CLAIM'
   | 'WORKING'
   | 'PAUSED'
   | 'WAITING_REVIEW'
@@ -16,13 +16,16 @@ export type AssignmentStatus =
   | 'COMPLETED'
   | 'CANCELLED';
 
+// Keep AssignmentStatus as alias for backward compatibility during migration
+export type AssignmentStatus = TaskStatus;
+
 export type Priority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 
 export interface Language {
   id: string;
   code: string;
   name: string;
-  pointMultiplier: number; // e.g. EN=1.0, AR=1.5, JP=2.0, ZH=2.0
+  pointMultiplier: number;
 }
 
 export interface UserProfile {
@@ -42,12 +45,13 @@ export interface TranslatorProfile {
   phone: string;
   avatar: string;
   languages: string[]; // Language codes, e.g., ['EN-ID', 'ID-EN']
-  maxCapacityPoints: number; // e.g. 20.0
+  maxCapacityPoints: number;
   currentLoadPoints: number;
   remainingCapacityPoints: number;
   utilizationPercentage: number;
   status: TranslatorStatus;
-  activeAssignmentId?: string;
+  activeTaskId?: string;
+  activeAssignmentId?: string; // backward compatibility alias
   completedJobsCount: number;
   address?: string;
   certifications?: string[];
@@ -67,25 +71,30 @@ export interface TranslatorProfile {
   performanceTrend?: 'UP' | 'DOWN' | 'STABLE';
 }
 
-export interface Assignment {
+export interface Task {
   id: string;
-  code: string; // e.g. DOC-2026-081
+  code: string; // e.g. TASK-DOC-001
   title: string;
   clientName: string;
-  documentType: 'Legal' | 'Financial' | 'Medical' | 'Marketing' | 'Technical' | 'Academic' | 'General';
+  documentType: string;
   pageCount: number;
   languageFrom: string;
   languageTo: string;
   pointMultiplier: number;
   calculatedPoints: number;
+  rewardPoints: number; // calculatedPoints & rewardPoints can be the same
   translatorId?: string;
   translatorName?: string;
-  status: AssignmentStatus;
+  claimedById?: string;
+  claimedByName?: string;
+  status: TaskStatus;
   priority: Priority;
   createdAt: string;
-  assignedAt?: string;
+  claimedAt?: string;
+  assignedAt?: string; // backward compatibility alias
   deadlineAt: string;
   startedAt?: string;
+  pausedAt?: string;
   submittedAt?: string;
   completedAt?: string;
   estimatedMinutes: number;
@@ -104,15 +113,20 @@ export interface Assignment {
   difficulty?: 'EASY' | 'MEDIUM' | 'HARD';
 }
 
+// Keep Assignment alias for backward compatibility during migration
+export type Assignment = Task;
+export type ClaimableTask = Task;
+
 export interface TimerLog {
   id: string;
-  assignmentId: string;
+  taskId: string;
+  assignmentId?: string; // backward compatibility alias
   translatorId: string;
   type: 'WORK' | 'PAUSE';
   startTime: string;
   endTime?: string;
   durationSeconds: number;
-  reason?: string; // reason for pause
+  reason?: string;
 }
 
 export interface ActivityLogItem {
@@ -123,8 +137,10 @@ export interface ActivityLogItem {
   userRole: UserRole;
   action: string;
   details: string;
-  assignmentId?: string;
-  assignmentTitle?: string;
+  taskId?: string;
+  assignmentId?: string; // backward compatibility alias
+  taskTitle?: string;
+  assignmentTitle?: string; // backward compatibility alias
   type: 'STATUS_CHANGE' | 'ASSIGNMENT' | 'TIMER' | 'SUBMISSION' | 'REVIEW' | 'SYSTEM' | 'REASSIGN';
 }
 
@@ -136,7 +152,8 @@ export interface SystemNotification {
   type: 'INFO' | 'WARNING' | 'ALERT' | 'SUCCESS';
   createdAt: string;
   read: boolean;
-  assignmentId?: string;
+  taskId?: string;
+  assignmentId?: string; // backward compatibility alias
 }
 
 export interface LanguagePointRule {
@@ -162,37 +179,6 @@ export interface SystemSettings {
   emailNotificationsEnabled: boolean;
   pushNotificationsEnabled: boolean;
   pointRules?: PointRuleConfig;
-}
-
-export interface ClaimableTask {
-  id: string;
-  orderId: string; // references parent assignment/order
-  code: string; // e.g. TASK-DOC-001-P1
-  title: string;
-  documentType: string;
-  languageFrom: string;
-  languageTo: string;
-  pageCount: number;
-  priority: Priority;
-  difficulty: 'EASY' | 'MEDIUM' | 'HARD';
-  estimatedMinutes: number;
-  deadlineAt: string;
-  rewardPoints: number;
-  status: 'AVAILABLE' | 'CLAIMED' | 'WORKING' | 'PAUSED' | 'WAITING_REVIEW' | 'REVISION' | 'COMPLETED';
-  claimedById?: string;
-  claimedByName?: string;
-  claimedAt?: string;
-  submittedAt?: string;
-  completedAt?: string;
-  resultFileUrl?: string;
-  resultFileName?: string;
-  submissionNotes?: string;
-  revisionNotes?: string;
-  pauseCount?: number;
-  totalPauseDuration?: number;
-  effectiveWorkSeconds?: number;
-  startedAt?: string;
-  pausedAt?: string;
 }
 
 export interface RewardPointHistory {

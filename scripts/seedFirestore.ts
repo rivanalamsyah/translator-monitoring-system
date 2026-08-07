@@ -133,12 +133,8 @@ const USERS_TO_SEED = [
 ];
 
 async function seedDatabase() {
-  // Check if users collection is empty
-  const usersSnapshot = await db.collection('users').limit(1).get();
-  if (!usersSnapshot.empty) {
-    console.log('ℹ️  Koleksi "users" sudah terisi. Seeder dilewati untuk menjaga idempotensi.');
-    return;
-  }
+  // Force run the seeder to ensure all accounts, custom claims, and profiles are synced.
+  console.log('ℹ️  Bypassed idempotency check to force synchronization.');
 
   console.log('⚙️  Seeding system_settings...');
   await db.collection('system_settings').doc('main').set(SYSTEM_SETTINGS);

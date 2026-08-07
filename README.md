@@ -2,9 +2,9 @@
 
 Sistem Monitoring Penerjemah (TMS) adalah aplikasi web modern single-page (SPA) berbasis **React (v19) + Vite + Tailwind CSS** yang dirancang untuk mengelola penugasan penerjemah secara efisien. Sistem ini menyediakan pemantauan waktu pengerjaan secara langsung (live timer), melacak kapasitas beban kerja (workload points), mengelola notifikasi, serta menyediakan alur persetujuan hasil terjemahan (approval workflow) bagi Super Admin.
 
-Aplikasi ini mendukung dua mode operasi:
-1. **Mode Lokal (Default):** Menggunakan `localStorage` browser untuk menyimpan data (ideal untuk demonstrasi, evaluasi, dan pengembangan cepat tanpa konfigurasi eksternal).
-2. **Mode Firebase (Production):** Menggunakan infrastruktur backend serverless dari Firebase (Authentication, Firestore, Hosting) untuk lingkungan produksi yang aman, real-time, dan terskala.
+Aplikasi ini beroperasi dalam mode:
+- **Backend Firebase (Real-time & Transaksional):** Seluruh data operasional (tugas, log waktu, notifikasi, profil) disimpan dan dikelola langsung pada Firebase Auth dan Firestore. Alur transaksi klaim tugas dikelola secara transaksional untuk menjamin integritas data.
+- **State Caching (Local Storage):** LocalStorage browser hanya digunakan untuk menyimpan pengaturan lokal UI client, seperti preferensi tema (Light/Dark mode) dan tab menu aktif yang terbuka.
 
 ---
 
@@ -142,3 +142,11 @@ Kompilasi kode frontend menjadi bundle statis yang dioptimalkan beserta Service 
 npm run build
 ```
 Hasil build akan tersimpan di folder `dist/` dan siap dideploy ke Firebase Hosting.
+
+Gunakan kredensial demo berikut untuk masuk ke sistem:
+Login Sebagai Super Admin:
+Email: admin@example.com
+Password: Admin@2026Secure!
+Login Sebagai Penerjemah (Andi Pratama):
+Email: andi.pratama@example.com
+Password: Translator@2026!

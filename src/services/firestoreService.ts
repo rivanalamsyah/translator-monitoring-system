@@ -2,15 +2,16 @@
  * Firestore Service — Real-time Listeners & CRUD Operations
  *
  * Semua data operasi Firestore dipusatkan di sini.
- * Dipanggil oleh AppContext saat USE_FIREBASE=true.
- *
- * Koleksi Firestore:
- *   - /translator_profiles   → TranslatorProfile[]
- *   - /assignments           → Assignment[]
- *   - /activity_logs         → ActivityLogItem[]
- *   - /notifications         → SystemNotification[]
- *   - /system_settings/main  → SystemSettings
- *   - /timer_logs            → TimerLog[]
+ * Koleksi Firestore sesuai spesifikasi:
+ *   - /users               → Profil Pengguna & Penerjemah (filtered by role)
+ *   - /tasks               → Seluruh pekerjaan/tugas (Task Pool)
+ *   - /taskTimers          → Catatan waktu kerja (TimerLog)
+ *   - /taskHistory         → Audit trail aktivitas tugas (ActivityLogItem)
+ *   - /languages           → Daftar bahasa & pengali poin
+ *   - /documentTypes       → Daftar jenis dokumen
+ *   - /notifications       → Notifikasi sistem
+ *   - /settings            → Konfigurasi sistem
+ *   - /reward_point_history → Riwayat distribusi poin
  */
 import {
   collection,
@@ -38,12 +39,11 @@ import { getAuth, createUserWithEmailAndPassword, signOut } from 'firebase/auth'
 import { getFirebaseDb, getFirebaseApp, firebaseConfig } from '../lib/firebase';
 import {
   TranslatorProfile,
-  Assignment,
+  Task,
   ActivityLogItem,
   SystemNotification,
   SystemSettings,
   TimerLog,
-  ClaimableTask,
   RewardPointHistory,
 } from '../types';
 
@@ -62,14 +62,15 @@ function mapTranslator(id: string, data: DocumentData): TranslatorProfile {
     name: data.name || '',
     email: data.email || '',
     phone: data.phone || '',
-    avatar: data.avatarUrl || '',
+    avatar: data.avatarUrl || data.avatar || '',
     languages: data.languages || [],
     maxCapacityPoints: data.maxCapacityPoints || 20,
     currentLoadPoints: data.currentLoadPoints || 0,
     remainingCapacityPoints: data.remainingCapacityPoints || 20,
     utilizationPercentage: data.utilizationPercentage || 0,
     status: data.status || 'FREE',
-    activeAssignmentId: data.activeAssignmentId,
+    activeTaskId: data.activeTaskId || data.activeAssignmentId,
+    activeAssignmentId: data.activeTaskId || data.activeAssignmentId,
     completedJobsCount: data.completedJobsCount || 0,
     address: data.address || '',
     certifications: data.certifications || [],
@@ -90,31 +91,45 @@ function mapTranslator(id: string, data: DocumentData): TranslatorProfile {
   };
 }
 
-function mapClaimableTask(id: string, data: DocumentData): ClaimableTask {
+function mapTask(id: string, data: DocumentData): Task {
   return {
     id,
-    orderId: data.orderId || '',
     code: data.code || '',
     title: data.title || '',
+    clientName: data.clientName || '',
     documentType: data.documentType || 'General',
+    pageCount: data.pageCount || 1,
     languageFrom: data.languageFrom || '',
     languageTo: data.languageTo || '',
-    pageCount: data.pageCount || 1,
+    pointMultiplier: data.pointMultiplier || 1.0,
+    calculatedPoints: data.calculatedPoints || data.rewardPoints || 0,
+    rewardPoints: data.rewardPoints || data.calculatedPoints || 0,
+    translatorId: data.translatorId || data.claimedById,
+    translatorName: data.translatorName || data.claimedByName,
+    status: data.status || 'DRAFT',
     priority: data.priority || 'MEDIUM',
-    difficulty: data.difficulty || 'MEDIUM',
-    estimatedMinutes: data.estimatedMinutes || 60,
-    deadlineAt: toISO(data.deadlineAt),
-    rewardPoints: data.rewardPoints || 0,
-    status: data.status || 'AVAILABLE',
-    claimedById: data.claimedById,
-    claimedByName: data.claimedByName,
+    createdAt: toISO(data.createdAt),
     claimedAt: data.claimedAt ? toISO(data.claimedAt) : undefined,
+    assignedAt: data.claimedAt ? toISO(data.claimedAt) : undefined,
+    deadlineAt: toISO(data.deadlineAt),
+    startedAt: data.startedAt ? toISO(data.startedAt) : undefined,
+    pausedAt: data.pausedAt ? toISO(data.pausedAt) : undefined,
     submittedAt: data.submittedAt ? toISO(data.submittedAt) : undefined,
     completedAt: data.completedAt ? toISO(data.completedAt) : undefined,
+    estimatedMinutes: data.estimatedMinutes || 60,
+    totalWorkingSeconds: data.totalWorkingSeconds || 0,
+    totalIdleSeconds: data.totalIdleSeconds || 0,
+    pauseCount: data.pauseCount || 0,
+    totalPauseDuration: data.totalPauseDuration || 0,
+    effectiveWorkSeconds: data.effectiveWorkSeconds || 0,
+    sourceFileUrl: data.sourceFileUrl,
+    sourceFileName: data.sourceFileName,
     resultFileUrl: data.resultFileUrl,
     resultFileName: data.resultFileName,
     submissionNotes: data.submissionNotes,
     revisionNotes: data.revisionNotes,
+    createdBy: data.createdBy || 'Admin',
+    difficulty: data.difficulty || 'MEDIUM',
   };
 }
 
@@ -130,72 +145,50 @@ function mapRewardPointHistory(id: string, data: DocumentData): RewardPointHisto
   };
 }
 
-function mapAssignment(id: string, data: DocumentData): Assignment {
-  return {
-    id,
-    code: data.code || '',
-    title: data.title || '',
-    clientName: data.clientName || '',
-    documentType: data.documentType || 'General',
-    pageCount: data.pageCount || 1,
-    languageFrom: data.languageFrom || 'EN-ID',
-    languageTo: data.languageTo || 'Indonesia',
-    pointMultiplier: data.pointMultiplier || 1.0,
-    calculatedPoints: data.calculatedPoints || 0,
-    translatorId: data.translatorId,
-    translatorName: data.translatorName,
-    status: data.status || 'UNASSIGNED',
-    priority: data.priority || 'MEDIUM',
-    createdAt: toISO(data.createdAt),
-    assignedAt: data.assignedAt ? toISO(data.assignedAt) : undefined,
-    deadlineAt: toISO(data.deadlineAt),
-    startedAt: data.startedAt ? toISO(data.startedAt) : undefined,
-    submittedAt: data.submittedAt ? toISO(data.submittedAt) : undefined,
-    completedAt: data.completedAt ? toISO(data.completedAt) : undefined,
-    estimatedMinutes: data.estimatedMinutes || 0,
-    totalWorkingSeconds: data.totalWorkingSeconds || 0,
-    totalIdleSeconds: data.totalIdleSeconds || 0,
-    sourceFileUrl: data.sourceFileUrl,
-    sourceFileName: data.sourceFileName,
-    resultFileUrl: data.resultFileUrl,
-    resultFileName: data.resultFileName,
-    submissionNotes: data.submissionNotes,
-    revisionNotes: data.revisionNotes,
-    createdBy: data.createdBy || 'Admin',
-  };
-}
-
 // ─── Subscriptions (Real-time Listeners) ────────────────────────────────────
 
 export function subscribeTranslators(
   callback: (data: TranslatorProfile[]) => void
 ): Unsubscribe {
   const db = getFirebaseDb();
-  const q = query(collection(db, 'translator_profiles'), orderBy('name'), limit(50));
+  // Filter users collection where role is 'PENERJEMAH' to list translator profiles
+  const q = query(
+    collection(db, 'users'),
+    where('role', '==', 'PENERJEMAH'),
+    limit(100)
+  );
   return onSnapshot(q, (snap) => {
     callback(snap.docs.map((d) => mapTranslator(d.id, d.data())));
   });
 }
 
-export function subscribeAssignments(
+export function subscribeTasks(
   translatorId: string | undefined,
-  callback: (data: Assignment[]) => void
+  callback: (data: Task[]) => void
 ): Unsubscribe {
   const db = getFirebaseDb();
   const constraints = translatorId
-    ? [where('translatorId', '==', translatorId), orderBy('createdAt', 'desc'), limit(50)]
-    : [orderBy('createdAt', 'desc'), limit(50)];
-  const q = query(collection(db, 'assignments'), ...constraints);
+    ? [where('translatorId', '==', translatorId), orderBy('createdAt', 'desc'), limit(100)]
+    : [orderBy('createdAt', 'desc'), limit(100)];
+  const q = query(collection(db, 'tasks'), ...constraints);
   return onSnapshot(q, (snap) => {
-    callback(snap.docs.map((d) => mapAssignment(d.id, d.data())));
+    callback(snap.docs.map((d) => mapTask(d.id, d.data())));
   });
+}
+
+// Backward compatibility alias
+export function subscribeAssignments(
+  translatorId: string | undefined,
+  callback: (data: Task[]) => void
+): Unsubscribe {
+  return subscribeTasks(translatorId, callback);
 }
 
 export function subscribeActivityLogs(
   callback: (data: ActivityLogItem[]) => void
 ): Unsubscribe {
   const db = getFirebaseDb();
-  const q = query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(50));
+  const q = query(collection(db, 'taskHistory'), orderBy('timestamp', 'desc'), limit(50));
   return onSnapshot(q, (snap) => {
     callback(
       snap.docs.map((d) => ({
@@ -212,7 +205,6 @@ export function subscribeNotifications(
   callback: (data: SystemNotification[]) => void
 ): Unsubscribe {
   const db = getFirebaseDb();
-  // Filter for unread and limit to recent 50
   const q = query(
     collection(db, 'notifications'),
     where('userId', 'in', ['ALL', userId]),
@@ -251,11 +243,13 @@ export function subscribeTimerLogs(
   const constraints = translatorId
     ? [where('translatorId', '==', translatorId), orderBy('startTime', 'desc'), limit(50)]
     : [orderBy('startTime', 'desc'), limit(50)];
-  const q = query(collection(db, 'timer_logs'), ...constraints);
+  const q = query(collection(db, 'taskTimers'), ...constraints);
   return onSnapshot(q, (snap) => {
     callback(
       snap.docs.map((d) => ({
         id: d.id,
+        taskId: d.data().taskId || d.data().assignmentId || '',
+        assignmentId: d.data().taskId || d.data().assignmentId || '',
         ...d.data(),
         startTime: toISO(d.data().startTime),
         endTime: d.data().endTime ? toISO(d.data().endTime) : undefined,
@@ -264,35 +258,43 @@ export function subscribeTimerLogs(
   });
 }
 
-// ─── Assignments CRUD ────────────────────────────────────────────────────────
+// ─── Tasks CRUD ─────────────────────────────────────────────────────────────
 
-export async function fsCreateAssignment(data: Omit<Assignment, 'id'>): Promise<string> {
+export async function fsCreateTask(data: Omit<Task, 'id'>): Promise<string> {
   const db = getFirebaseDb();
-  const ref = await addDoc(collection(db, 'assignments'), {
+  const ref = await addDoc(collection(db, 'tasks'), {
     ...data,
     createdAt: serverTimestamp(),
-    deadlineAt: data.deadlineAt,
   });
   return ref.id;
 }
 
-export async function fsUpdateAssignment(id: string, data: Partial<Assignment>): Promise<void> {
+export async function fsUpdateTask(id: string, data: Partial<Task>): Promise<void> {
   const db = getFirebaseDb();
-  await updateDoc(doc(db, 'assignments', id), data as DocumentData);
+  await updateDoc(doc(db, 'tasks', id), data as DocumentData);
 }
 
-export async function fsDeleteAssignment(id: string): Promise<void> {
+export async function fsDeleteTask(id: string): Promise<void> {
   const db = getFirebaseDb();
-  await deleteDoc(doc(db, 'assignments', id));
+  await deleteDoc(doc(db, 'tasks', id));
 }
 
-// ─── Translators CRUD ────────────────────────────────────────────────────────
+// Backward compatibility wrappers
+export async function fsCreateAssignment(data: Omit<Task, 'id'>) { return fsCreateTask(data); }
+export async function fsUpdateAssignment(id: string, data: Partial<Task>) { return fsUpdateTask(id, data); }
+export async function fsDeleteAssignment(id: string) { return fsDeleteTask(id); }
+export async function fsCreateClaimableTask(data: Omit<Task, 'id'>) { return fsCreateTask(data); }
+export async function fsUpdateClaimableTask(id: string, data: Partial<Task>) { return fsUpdateTask(id, data); }
+export async function fsDeleteClaimableTask(id: string) { return fsDeleteTask(id); }
+
+// ─── Translators (Users with role PENERJEMAH) CRUD ────────────────────────────
 
 export async function fsAddTranslator(data: Omit<TranslatorProfile, 'id'>): Promise<string> {
   const db = getFirebaseDb();
   const { avatar, ...rest } = data;
-  const ref = await addDoc(collection(db, 'translator_profiles'), {
+  const ref = await addDoc(collection(db, 'users'), {
     ...rest,
+    role: 'PENERJEMAH',
     avatarUrl: avatar,
     createdAt: serverTimestamp(),
   });
@@ -304,19 +306,19 @@ export async function fsUpdateTranslator(id: string, data: Partial<TranslatorPro
   const { avatar, ...rest } = data;
   const updateData: DocumentData = { ...rest };
   if (avatar !== undefined) updateData.avatarUrl = avatar;
-  await updateDoc(doc(db, 'translator_profiles', id), updateData);
+  await updateDoc(doc(db, 'users', id), updateData);
 }
 
 export async function fsDeleteTranslator(id: string): Promise<void> {
   const db = getFirebaseDb();
-  await deleteDoc(doc(db, 'translator_profiles', id));
+  await deleteDoc(doc(db, 'users', id));
 }
 
-// ─── Activity Logs ────────────────────────────────────────────────────────────
+// ─── Activity Logs (taskHistory) ─────────────────────────────────────────────
 
 export async function fsAddActivityLog(data: Omit<ActivityLogItem, 'id' | 'timestamp'>): Promise<void> {
   const db = getFirebaseDb();
-  await addDoc(collection(db, 'activity_logs'), {
+  await addDoc(collection(db, 'taskHistory'), {
     ...data,
     timestamp: serverTimestamp(),
   });
@@ -352,7 +354,7 @@ export async function fsClearNotifications(userId: string): Promise<void> {
 
 export async function fsAddTimerLog(data: Omit<TimerLog, 'id' | 'startTime'>): Promise<string> {
   const db = getFirebaseDb();
-  const ref = await addDoc(collection(db, 'timer_logs'), {
+  const ref = await addDoc(collection(db, 'taskTimers'), {
     ...data,
     startTime: serverTimestamp(),
   });
@@ -361,7 +363,7 @@ export async function fsAddTimerLog(data: Omit<TimerLog, 'id' | 'startTime'>): P
 
 export async function fsUpdateTimerLog(id: string, data: Partial<TimerLog>): Promise<void> {
   const db = getFirebaseDb();
-  await updateDoc(doc(db, 'timer_logs', id), data as DocumentData);
+  await updateDoc(doc(db, 'taskTimers', id), data as DocumentData);
 }
 
 // ─── Settings ────────────────────────────────────────────────────────────────
@@ -380,7 +382,7 @@ export async function fsSubmitAssignmentCallable(data: {
   submissionNotes: string;
 }): Promise<any> {
   const db = getFirebaseDb();
-  await updateDoc(doc(db, 'claimable_tasks', data.assignmentId), {
+  await updateDoc(doc(db, 'tasks', data.assignmentId), {
     status: 'WAITING_REVIEW',
     resultFileName: data.resultFileName,
     resultFileUrl: data.resultFileUrl,
@@ -411,22 +413,14 @@ export async function fsRegisterTranslatorCallable(data: {
 
     const db = getFirebaseDb();
 
-    // Write users collection
+    // Write unified users collection
     await setDoc(doc(db, 'users', newUid), {
-      id: newUid,
-      name: data.name,
-      email: data.email,
-      role: 'PENERJEMAH',
-      createdAt: new Date().toISOString(),
-    });
-
-    // Write translator profiles collection
-    await setDoc(doc(db, 'translator_profiles', newUid), {
       id: newUid,
       userId: newUid,
       name: data.name,
       email: data.email,
       phone: data.phone,
+      role: 'PENERJEMAH',
       languages: data.languages,
       maxCapacityPoints: data.maxCapacityPoints,
       currentLoadPoints: 0,
@@ -452,8 +446,8 @@ export async function fsClaimTaskTransaction(
   translatorName: string
 ): Promise<void> {
   const db = getFirebaseDb();
-  const taskRef = doc(db, 'claimable_tasks', taskId);
-  const translatorRef = doc(db, 'translator_profiles', translatorId);
+  const taskRef = doc(db, 'tasks', taskId);
+  const translatorRef = doc(db, 'users', translatorId);
 
   await runTransaction(db, async (transaction) => {
     const taskDoc = await transaction.get(taskRef);
@@ -462,7 +456,7 @@ export async function fsClaimTaskTransaction(
     }
 
     const taskData = taskDoc.data();
-    if (taskData.status !== 'AVAILABLE') {
+    if (taskData.status !== 'WAITING_CLAIM' && taskData.status !== 'AVAILABLE') {
       throw new Error('Tugas ini sudah diambil oleh penerjemah lain.');
     }
 
@@ -485,6 +479,8 @@ export async function fsClaimTaskTransaction(
     // Update Task status to WORKING
     transaction.update(taskRef, {
       status: 'WORKING',
+      translatorId: translatorId,
+      translatorName: translatorName,
       claimedById: translatorId,
       claimedByName: translatorName,
       claimedAt: nowStr,
@@ -497,6 +493,8 @@ export async function fsClaimTaskTransaction(
       remainingCapacityPoints: maxCapacity - (currentLoad + taskLoad),
       utilizationPercentage: Math.round(((currentLoad + taskLoad) / maxCapacity) * 100),
       status: 'BUSY',
+      activeTaskId: taskId,
+      activeAssignmentId: taskId,
     });
   });
 }
@@ -507,7 +505,7 @@ export async function fsReviewClaimedTask(
   revisionNotes?: string
 ): Promise<void> {
   const db = getFirebaseDb();
-  const taskRef = doc(db, 'claimable_tasks', taskId);
+  const taskRef = doc(db, 'tasks', taskId);
   const settingsRef = doc(db, 'system_settings', 'main');
 
   await runTransaction(db, async (transaction) => {
@@ -520,12 +518,12 @@ export async function fsReviewClaimedTask(
       throw new Error('Tugas tidak sedang menunggu review.');
     }
 
-    const translatorId = taskData.claimedById;
+    const translatorId = taskData.translatorId || taskData.claimedById;
     if (!translatorId) {
       throw new Error('Tugas tidak memiliki penerjemah terasosiasi.');
     }
 
-    const translatorRef = doc(db, 'translator_profiles', translatorId);
+    const translatorRef = doc(db, 'users', translatorId);
     const translatorDoc = await transaction.get(translatorRef);
     if (!translatorDoc.exists()) {
       throw new Error('Profil penerjemah tidak ditemukan.');
@@ -546,7 +544,7 @@ export async function fsReviewClaimedTask(
       const speedBonusEligible = workSecs > 0 && workSecs <= estSecs;
       const speedBonus = speedBonusEligible ? speedBonusPoints : 0;
 
-      const basePoints = taskData.rewardPoints || 0;
+      const basePoints = taskData.rewardPoints || taskData.calculatedPoints || 0;
       const totalPointsEarned = basePoints + speedBonus;
 
       const currentPoints = translatorData.points || 0;
@@ -568,6 +566,8 @@ export async function fsReviewClaimedTask(
         remainingCapacityPoints: maxCapacity - newLoad,
         utilizationPercentage: Math.round((newLoad / maxCapacity) * 100),
         status: 'FREE',
+        activeTaskId: '',
+        activeAssignmentId: '',
       });
 
       // Update Task status
@@ -621,6 +621,11 @@ export async function fsReviewClaimedTask(
         revisionNotes: revisionNotes || '',
       });
 
+      // Update translator status back to BUSY but remaining revision tasks can still be worked on
+      transaction.update(translatorRef, {
+        status: 'BUSY'
+      });
+
       // Add Notification
       const notifRef = doc(collection(db, 'notifications'));
       transaction.set(notifRef, {
@@ -636,70 +641,56 @@ export async function fsReviewClaimedTask(
   });
 }
 
-export async function fsCreateClaimableTask(task: Omit<ClaimableTask, 'id'>): Promise<string> {
-  const db = getFirebaseDb();
-  const docRef = await addDoc(collection(db, 'claimable_tasks'), {
-    ...task,
-    createdAt: serverTimestamp(),
-  });
-  return docRef.id;
-}
-
-export async function fsUpdateClaimableTask(id: string, updates: Partial<ClaimableTask>): Promise<void> {
-  const db = getFirebaseDb();
-  await updateDoc(doc(db, 'claimable_tasks', id), updates);
-}
-
-export async function fsDeleteClaimableTask(id: string): Promise<void> {
-  const db = getFirebaseDb();
-  await deleteDoc(doc(db, 'claimable_tasks', id));
-}
-
-export async function fsAddRewardPointHistory(history: Omit<RewardPointHistory, 'id'>): Promise<string> {
-  const db = getFirebaseDb();
-  const docRef = await addDoc(collection(db, 'reward_point_history'), {
-    ...history,
-    timestamp: serverTimestamp(),
-  });
-  return docRef.id;
-}
-
-export function listenClaimableTasks(
+export function listenTasks(
   isAdmin: boolean,
   translatorId: string | undefined,
-  callback: (tasks: ClaimableTask[]) => void
+  callback: (tasks: Task[]) => void
 ): Unsubscribe {
   const db = getFirebaseDb();
   let q;
   if (isAdmin) {
-    q = query(collection(db, 'claimable_tasks'), orderBy('createdAt', 'desc'), limit(50));
+    q = query(collection(db, 'tasks'), orderBy('createdAt', 'desc'), limit(100));
   } else {
     if (translatorId) {
       q = query(
-        collection(db, 'claimable_tasks'),
+        collection(db, 'tasks'),
         or(
+          where('status', '==', 'WAITING_CLAIM'),
           where('status', '==', 'AVAILABLE'),
+          where('translatorId', '==', translatorId),
           where('claimedById', '==', translatorId)
         ),
         orderBy('createdAt', 'desc'),
-        limit(50)
+        limit(100)
       );
     } else {
       q = query(
-        collection(db, 'claimable_tasks'),
-        where('status', '==', 'AVAILABLE'),
+        collection(db, 'tasks'),
+        or(
+          where('status', '==', 'WAITING_CLAIM'),
+          where('status', '==', 'AVAILABLE')
+        ),
         orderBy('createdAt', 'desc'),
-        limit(50)
+        limit(100)
       );
     }
   }
   return onSnapshot(q, (snapshot) => {
-    const tasks: ClaimableTask[] = [];
+    const tasks: Task[] = [];
     snapshot.forEach((doc) => {
-      tasks.push(mapClaimableTask(doc.id, doc.data()));
+      tasks.push(mapTask(doc.id, doc.data()));
     });
     callback(tasks);
   });
+}
+
+// Backward compatibility wrapper
+export function listenClaimableTasks(
+  isAdmin: boolean,
+  translatorId: string | undefined,
+  callback: (tasks: Task[]) => void
+): Unsubscribe {
+  return listenTasks(isAdmin, translatorId, callback);
 }
 
 export function listenRewardPointHistory(callback: (history: RewardPointHistory[]) => void): Unsubscribe {
