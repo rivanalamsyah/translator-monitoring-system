@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const sharp = require('sharp');
 
-const SOURCE_LOGO = path.join(__dirname, '../public/assets/logo.png');
+const SOURCE_LOGO = path.join(__dirname, '../public/assets/logo-pwa.png');
 const OUT_DIR = path.join(__dirname, '../public/icons');
 
 if (!fs.existsSync(OUT_DIR)) {
@@ -12,7 +12,7 @@ if (!fs.existsSync(OUT_DIR)) {
 const SIZES = [72, 96, 128, 144, 152, 192, 384, 512];
 
 async function generateIcons() {
-  console.log('Generating PWA icons from logo.png using sharp...\n');
+  console.log('Generating PWA icons from logo-pwa.png using sharp...\n');
   
   if (!fs.existsSync(SOURCE_LOGO)) {
     console.error(`Error: Source logo file not found at ${SOURCE_LOGO}`);
