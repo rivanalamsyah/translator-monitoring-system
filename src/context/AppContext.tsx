@@ -367,7 +367,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               const completedWorkSecs = timerLogs
                 .filter((l) => l.taskId === t.id && l.type === 'WORK' && l.endTime && l.id !== activeLog.id)
                 .reduce((sum, l) => sum + (l.durationSeconds || 0), 0);
-              
+
               const calculatedEffective = completedWorkSecs + currentSessionSecs;
               return {
                 ...t,
@@ -531,10 +531,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const updatedLogs = timerLogs.map(l => l.taskId === taskId && !l.endTime && l.id === activeLog?.id ? { ...l, endTime: nowStr, durationSeconds: Math.max(0, Math.round((Date.now() - new Date(l.startTime).getTime()) / 1000)) } : l);
     const filteredWorkLogs = updatedLogs.filter(l => l.taskId === taskId && l.type === 'WORK');
     const filteredPauseLogs = updatedLogs.filter(l => l.taskId === taskId && l.type === 'PAUSE');
-    
+
     let totalWorkSecs = 0;
     filteredWorkLogs.forEach(l => { totalWorkSecs += l.durationSeconds || 0; });
-    
+
     let totalPauseSecs = 0;
     filteredPauseLogs.forEach(l => { totalPauseSecs += l.durationSeconds || 0; });
 
@@ -592,10 +592,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const updatedLogs = timerLogs.map(l => l.taskId === taskId && !l.endTime && l.id === activeLog?.id ? { ...l, endTime: nowStr, durationSeconds: Math.max(0, Math.round((Date.now() - new Date(l.startTime).getTime()) / 1000)) } : l);
     const filteredWorkLogs = updatedLogs.filter(l => l.taskId === taskId && l.type === 'WORK');
     const filteredPauseLogs = updatedLogs.filter(l => l.taskId === taskId && l.type === 'PAUSE');
-    
+
     let totalWorkSecs = 0;
     filteredWorkLogs.forEach(l => { totalWorkSecs += l.durationSeconds || 0; });
-    
+
     let totalPauseSecs = 0;
     filteredPauseLogs.forEach(l => { totalPauseSecs += l.durationSeconds || 0; });
 
@@ -641,9 +641,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       if (translatorId) {
         // Enforce: only set to FREE if translator has no other tasks in WORKING or PAUSED state
         const hasOtherActiveTasks = store.tasks.some(
-          (t) => t.id !== taskId && 
-                 (t.translatorId === translatorId || t.claimedById === translatorId) && 
-                 (t.status === 'WORKING' || t.status === 'PAUSED')
+          (t) => t.id !== taskId &&
+            (t.translatorId === translatorId || t.claimedById === translatorId) &&
+            (t.status === 'WORKING' || t.status === 'PAUSED')
         );
         const nextStatus = hasOtherActiveTasks ? 'BUSY' : 'FREE';
         await fsUpdateTranslator(translatorId, { status: nextStatus });
@@ -739,7 +739,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       onConfirm: async () => {
         const code = `TASK-2026-${Math.floor(100 + Math.random() * 900)}`;
         const pageCount = newDoc.pageCount || 10;
-        
+
         const rules = settings.pointRules;
         const basePoints = rules?.basePointsPerPage ?? 1;
         const diffMultiplier = rules?.difficultyMultipliers?.[newDoc.difficulty || 'MEDIUM'] ?? 1.0;
@@ -996,10 +996,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const activeUser = isAdmin
       ? { id: 'admin-1', name: 'Admin', role: 'ADMIN' as UserRole }
       : {
-          id: currentTranslatorProfile?.userId || 'u-1',
-          name: currentTranslatorProfile?.name || 'Translator',
-          role: 'PENERJEMAH' as UserRole,
-        };
+        id: currentTranslatorProfile?.userId || 'u-1',
+        name: currentTranslatorProfile?.name || 'Translator',
+        role: 'PENERJEMAH' as UserRole,
+      };
 
     await fsAddActivityLog({
       userId: activeUser.id,
@@ -1039,6 +1039,68 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const task = store.tasks.find((t) => t.id === taskId);
     if (!task || !currentTranslatorProfile) return;
 
+    const pageCount = task.pageCount || 0;
+    const currentLoad = currentTranslatorProfile.currentLoadPoints || 0;
+    const maxCapacity = currentTranslatorProfile.maxCapacityPoints || 20;
+    const remainingCapacity = currentTranslatorProfile.remainingCapacityPoints || 0;
+
+    // Condition 1: Hard block if it strictly exceeds capacity limits
+    if (currentLoad + pageCount > maxCapacity) {
+      confirmAction({
+        title: '⚠️ Batas Beban Kerja Terlampaui',
+        message: `Tugas "${task.title}" memiliki beban volume ${pageCount} halaman. Ini melebihi sisa kapasitas beban kerja aktif Anda (${remainingCapacity} halaman tersisa dari batas maksimal ${maxCapacity} halaman).\n\nUntuk menjaga kualitas terjemahan dan kepatuhan SLA, Anda tidak dapat mengklaim tugas ini saat ini. Silakan selesaikan tugas aktif Anda terlebih dahulu.`,
+        type: 'danger',
+        confirmText: 'Tutup',
+        showCancel: false,
+        onConfirm: () => {},
+      });
+      return;
+    }
+
+    // Condition 2: Warning confirm if it is >= 50 pages but they still have capacity
+    if (pageCount >= 50) {
+      confirmAction({
+        title: '⚠️ Peringatan Volume Tinggi (50+ Halaman)',
+        message: `Perhatian: Tugas "${task.title}" memiliki volume yang sangat besar (${pageCount} halaman). Mengambil tugas bervolume tinggi memerlukan perhatian ekstra terhadap konsistensi istilah dan manajemen batas waktu. Apakah Anda yakin sanggup berkomitmen penuh pada SLA tugas ini?`,
+        type: 'warning',
+        confirmText: 'Ya, Saya Sanggup',
+        cancelText: 'Batal',
+        successTitle: 'Task Berhasil Diambil',
+        successMessage: `Task "${task.title}" telah berhasil diklaim. Mulai kerjakan sekarang!`,
+        onConfirm: async () => {
+          await fsClaimTaskTransaction(
+            taskId,
+            currentTranslatorProfile.id,
+            currentTranslatorProfile.name
+          );
+          // Start the timer automatically by adding a timer log
+          await fsAddTimerLog({
+            taskId,
+            translatorId: currentTranslatorProfile.id,
+            type: 'WORK',
+            durationSeconds: 0,
+          });
+          await fsAddNotification({
+            userId: currentTranslatorProfile.userId,
+            title: 'Task Berhasil Diklaim',
+            message: `Task "${task.title}" berhasil Anda klaim. Pengerjaan dan durasi waktu telah dimulai otomatis.`,
+            type: 'SUCCESS',
+            read: false,
+          });
+          await fsAddActivityLog({
+            userId: currentTranslatorProfile.userId,
+            userName: currentTranslatorProfile.name,
+            userRole: 'PENERJEMAH',
+            action: 'Mengklaim Task',
+            details: `Mengklaim task ${task.code} - ${task.title} (${task.rewardPoints} poin) dan memulai pengerjaan.`,
+            type: 'ASSIGNMENT',
+          });
+        },
+      });
+      return;
+    }
+
+    // Standard Claim flow
     confirmAction({
       title: 'Ambil Task Ini?',
       message: `Anda akan mengambil task "${task.title}" (${task.pageCount} hal, ${task.rewardPoints} poin). Task otomatis terkunci untuk Anda.`,
