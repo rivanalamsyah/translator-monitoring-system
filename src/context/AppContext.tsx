@@ -1052,10 +1052,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           currentTranslatorProfile.id,
           currentTranslatorProfile.name
         );
+        // Start the timer automatically by adding a timer log
+        await fsAddTimerLog({
+          taskId,
+          translatorId: currentTranslatorProfile.id,
+          type: 'WORK',
+          durationSeconds: 0,
+        });
         await fsAddNotification({
           userId: currentTranslatorProfile.userId,
           title: 'Task Berhasil Diklaim',
-          message: `Task "${task.title}" berhasil Anda klaim. Segera kerjakan sebelum deadline!`,
+          message: `Task "${task.title}" berhasil Anda klaim. Pengerjaan dan durasi waktu telah dimulai otomatis.`,
           type: 'SUCCESS',
           read: false,
         });
@@ -1064,7 +1071,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           userName: currentTranslatorProfile.name,
           userRole: 'PENERJEMAH',
           action: 'Mengklaim Task',
-          details: `Mengklaim task ${task.code} - ${task.title} (${task.rewardPoints} poin).`,
+          details: `Mengklaim task ${task.code} - ${task.title} (${task.rewardPoints} poin) dan memulai pengerjaan.`,
           type: 'ASSIGNMENT',
         });
       },
