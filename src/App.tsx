@@ -52,7 +52,12 @@ const MainLayout: React.FC = () => {
   }, [currentUser, currentRole, adminTab, translatorTab]);
 
   if (!currentUser) {
-    return <Login />;
+    return (
+      <>
+        <Login />
+        <CustomDialog />
+      </>
+    );
   }
 
   const renderAdminTab = () => {

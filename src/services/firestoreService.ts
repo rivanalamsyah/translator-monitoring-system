@@ -305,12 +305,23 @@ export async function fsUpdateTranslator(id: string, data: Partial<TranslatorPro
   const { avatar, ...rest } = data;
   const updateData: DocumentData = { ...rest };
   if (avatar !== undefined) updateData.avatarUrl = avatar;
-  await updateDoc(doc(db, 'users', id), updateData);
+  
+  // Update translator_profiles
+  await updateDoc(doc(db, 'translator_profiles', id), updateData);
+  
+  // Sync name & email to users
+  const userUpdate: DocumentData = {};
+  if (data.name !== undefined) userUpdate.name = data.name;
+  if (data.email !== undefined) userUpdate.email = data.email;
+  if (Object.keys(userUpdate).length > 0) {
+    await updateDoc(doc(db, 'users', id), userUpdate);
+  }
 }
 
 export async function fsDeleteTranslator(id: string): Promise<void> {
   const db = getFirebaseDb();
   await deleteDoc(doc(db, 'users', id));
+  await deleteDoc(doc(db, 'translator_profiles', id));
 }
 
 // ─── Activity Logs (taskHistory) ─────────────────────────────────────────────
@@ -420,6 +431,17 @@ export async function fsRegisterTranslatorCallable(data: {
       email: data.email,
       phone: data.phone,
       role: 'PENERJEMAH',
+      isActive: true,
+      createdAt: new Date().toISOString(),
+    });
+
+    // Write translator_profiles collection
+    await setDoc(doc(db, 'translator_profiles', newUid), {
+      userId: newUid,
+      name: data.name,
+      email: data.email,
+      phone: data.phone,
+      avatar: '',
       languages: data.languages,
       maxCapacityPoints: data.maxCapacityPoints,
       currentLoadPoints: 0,
@@ -428,6 +450,12 @@ export async function fsRegisterTranslatorCallable(data: {
       status: 'FREE',
       completedJobsCount: 0,
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      version: 1,
+      points: 0,
+      level: 1,
+      xp: 0,
+      achievements: ['NEWBIE'],
     });
 
     return { success: true, uid: newUid };
@@ -446,7 +474,7 @@ export async function fsClaimTaskTransaction(
 ): Promise<void> {
   const db = getFirebaseDb();
   const taskRef = doc(db, 'tasks', taskId);
-  const translatorRef = doc(db, 'users', translatorId);
+  const translatorRef = doc(db, 'translator_profiles', translatorId);
 
   await runTransaction(db, async (transaction) => {
     const taskDoc = await transaction.get(taskRef);
@@ -522,7 +550,7 @@ export async function fsReviewClaimedTask(
       throw new Error('Tugas tidak memiliki penerjemah terasosiasi.');
     }
 
-    const translatorRef = doc(db, 'users', translatorId);
+    const translatorRef = doc(db, 'translator_profiles', translatorId);
     const translatorDoc = await transaction.get(translatorRef);
     if (!translatorDoc.exists()) {
       throw new Error('Profil penerjemah tidak ditemukan.');
@@ -564,7 +592,7 @@ export async function fsReviewClaimedTask(
         currentLoadPoints: newLoad,
         remainingCapacityPoints: maxCapacity - newLoad,
         utilizationPercentage: Math.round((newLoad / maxCapacity) * 100),
-        status: 'FREE',
+        status: newLoad === 0 ? 'FREE' : 'BUSY',
         activeTaskId: '',
         activeAssignmentId: '',
       });

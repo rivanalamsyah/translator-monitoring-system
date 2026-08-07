@@ -620,38 +620,48 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const task = store.tasks.find((t) => t.id === taskId);
     if (!task) return;
 
-    confirmAction({
-      title: 'Kirim Hasil Pekerjaan?',
-      message: 'Apakah Anda yakin menyerahkan hasil terjemahan? Status tugas akan berubah menjadi Menunggu Review.',
-      type: 'info',
-      confirmText: 'Kirim',
-      successTitle: 'Hasil Dikirim!',
-      successMessage: `Tugas "${task.title}" berhasil diserahkan untuk ditinjau oleh Admin.`,
-      onConfirm: async () => {
-        await fsSubmitAssignmentCallable({
-          assignmentId: taskId,
-          resultFileName: 'Google Drive Link',
-          resultFileUrl,
-          submissionNotes: notes,
-        });
+    showLoading('Mengirimkan Pekerjaan', 'Sedang menyerahkan hasil terjemahan Anda...');
 
-        const translatorId = task.translatorId || task.claimedById;
-        if (translatorId) {
-          await fsUpdateTranslator(translatorId, { status: 'FREE' });
-        }
+    try {
+      await fsSubmitAssignmentCallable({
+        assignmentId: taskId,
+        resultFileName: 'Google Drive Link',
+        resultFileUrl,
+        submissionNotes: notes,
+      });
 
-        await fsAddActivityLog({
-          userId: currentUser?.role === 'ADMIN' ? 'admin-1' : (currentTranslatorProfile?.userId || 'u-1'),
-          userName: currentUser?.role === 'ADMIN' ? 'Admin' : (currentTranslatorProfile?.name || 'Translator'),
-          userRole: currentUser?.role === 'ADMIN' ? 'ADMIN' : 'PENERJEMAH',
-          action: 'Mengirimkan Terjemahan',
-          details: `Menyerahkan tautan Google Drive: ${resultFileUrl}. Menunggu tinjauan.`,
-          taskId,
-          taskTitle: task.title,
-          type: 'SUBMISSION',
-        });
+      const translatorId = task.translatorId || task.claimedById;
+      if (translatorId) {
+        // Enforce: only set to FREE if translator has no other tasks in WORKING or PAUSED state
+        const hasOtherActiveTasks = store.tasks.some(
+          (t) => t.id !== taskId && 
+                 (t.translatorId === translatorId || t.claimedById === translatorId) && 
+                 (t.status === 'WORKING' || t.status === 'PAUSED')
+        );
+        const nextStatus = hasOtherActiveTasks ? 'BUSY' : 'FREE';
+        await fsUpdateTranslator(translatorId, { status: nextStatus });
       }
-    });
+
+      await fsAddActivityLog({
+        userId: currentUser?.role === 'ADMIN' ? 'admin-1' : (currentTranslatorProfile?.userId || 'u-1'),
+        userName: currentUser?.role === 'ADMIN' ? 'Admin' : (currentTranslatorProfile?.name || 'Translator'),
+        userRole: currentUser?.role === 'ADMIN' ? 'ADMIN' : 'PENERJEMAH',
+        action: 'Mengirimkan Terjemahan',
+        details: `Menyerahkan tautan Google Drive: ${resultFileUrl}. Menunggu tinjauan.`,
+        taskId,
+        taskTitle: task.title,
+        type: 'SUBMISSION',
+      });
+
+      showSuccess(
+        'Hasil Pekerjaan Terkirim!',
+        `Tugas "${task.title}" berhasil diserahkan. Status pengerjaan berubah menjadi Menunggu Review.`
+      );
+    } catch (err: any) {
+      console.error('[AppContext submitAssignment Error]', err);
+      showError('Gagal Mengirimkan Pekerjaan', err?.message || 'Terjadi kesalahan sistem saat menyerahkan pekerjaan.');
+      throw err; // propagates to let the modal form stay open
+    }
   };
 
   // ACTION: Approve Task

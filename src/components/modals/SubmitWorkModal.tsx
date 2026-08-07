@@ -37,11 +37,13 @@ export const SubmitWorkModal: React.FC = () => {
   if (!activeSubmitAssignment) return null;
 
   const onSubmit = async (data: SubmitWorkForm) => {
-    // Simulate submission delay
-    await new Promise((resolve) => setTimeout(resolve, 600));
-    submitAssignment(activeSubmitAssignment.id, data.driveUrl.trim(), data.notes || '');
-    reset();
-    setActiveSubmitAssignment(null);
+    try {
+      await submitAssignment(activeSubmitAssignment.id, data.driveUrl.trim(), data.notes || '');
+      reset();
+      setActiveSubmitAssignment(null);
+    } catch (e) {
+      console.error('[SubmitWorkModal onSubmit Error]', e);
+    }
   };
 
   return (
