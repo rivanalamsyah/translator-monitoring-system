@@ -134,25 +134,25 @@ export const Sidebar: React.FC = () => {
 
   // ── Nav items ──
   const adminNavItems: NavItem[] = [
-    { id: 'dashboard',    label: 'Dashboard',             icon: LayoutDashboard },
-    { id: 'assignments',  label: 'Task',                  icon: FileText        },
-    { id: 'translators',  label: 'Translator',            icon: Users           },
-    { id: 'leaderboard',  label: 'Leaderboard',           icon: Trophy          },
-    { id: 'reports',      label: 'Laporan',               icon: BarChart3       },
-    { id: 'settings',     label: 'Pengaturan',            icon: Settings        },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'assignments', label: 'Task', icon: FileText },
+    { id: 'translators', label: 'Translator', icon: Users },
+    { id: 'leaderboard', label: 'Leaderboard', icon: Trophy },
+    { id: 'reports', label: 'Laporan', icon: BarChart3 },
+    { id: 'settings', label: 'Pengaturan', icon: Settings },
   ];
 
   const translatorNavItems: NavItem[] = [
-    { id: 'dashboard',    label: 'Dashboard',                    icon: LayoutDashboard },
-    { id: 'tasks',        label: 'Task',                         icon: FileText        },
-    { id: 'leaderboard',  label: 'Leaderboard',                  icon: Trophy          },
-    { id: 'profile',      label: 'Profil',                       icon: User            },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'tasks', label: 'Task', icon: FileText },
+    { id: 'leaderboard', label: 'Leaderboard', icon: Trophy },
+    { id: 'profile', label: 'Profil', icon: User },
   ];
 
-  const items      = currentRole === 'ADMIN' ? adminNavItems : translatorNavItems;
-  const currentTab = currentRole === 'ADMIN' ? adminTab      : translatorTab;
-  const setTab     = currentRole === 'ADMIN' ? setAdminTab   : setTranslatorTab;
-  const isAdmin    = currentRole === 'ADMIN';
+  const items = currentRole === 'ADMIN' ? adminNavItems : translatorNavItems;
+  const currentTab = currentRole === 'ADMIN' ? adminTab : translatorTab;
+  const setTab = currentRole === 'ADMIN' ? setAdminTab : setTranslatorTab;
+  const isAdmin = currentRole === 'ADMIN';
   const displayName = isAdmin ? 'Super Admin' : currentTranslatorProfile?.name;
   const displayRole = isAdmin
     ? 'Administrator Sistem'
@@ -262,31 +262,48 @@ export const Sidebar: React.FC = () => {
               <button
                 onClick={handleInstall}
                 aria-label="Install aplikasi"
-                className="w-full flex justify-center items-center p-2.5 rounded-xl
+                className="w-full flex justify-center items-center p-2 rounded-xl
                   bg-gradient-to-r from-violet-500 to-purple-500 text-white
                   shadow-md shadow-purple-200 hover:shadow-lg hover:shadow-purple-300
                   transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
               >
-                <Download className="h-[18px] w-[18px]" />
+                <div className="h-5 w-5 rounded-md bg-white p-0.5 flex items-center justify-center">
+                  <img
+                    src={logoImg}
+                    alt="Logo"
+                    className="h-full w-full object-contain"
+                  />
+                </div>
               </button>
             </Tooltip>
           ) : (
             <div className="rounded-xl border border-purple-100 bg-gradient-to-br from-violet-50 to-purple-50 p-3">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-extrabold text-purple-600 uppercase tracking-wider">
-                  Install Aplikasi
-                </span>
-                <button
-                  onClick={dismissInstallBanner}
-                  aria-label="Tutup"
-                  className="text-purple-300 hover:text-purple-500 transition-colors"
-                >
-                  <X className="h-3 w-3" />
-                </button>
+              <div className="flex items-start gap-2.5 mb-2.5">
+                <div className="h-8 w-8 rounded-lg bg-white border border-purple-100/50 flex items-center justify-center shrink-0 p-1 shadow-sm">
+                  <img
+                    src={logoImg}
+                    alt="Logo"
+                    className="h-full w-full object-contain"
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-extrabold text-purple-600 uppercase tracking-wider">
+                      Install Aplikasi
+                    </span>
+                    <button
+                      onClick={dismissInstallBanner}
+                      aria-label="Tutup"
+                      className="text-purple-300 hover:text-purple-500 transition-colors"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                  <p className="text-[9px] text-slate-500 mt-0.5 leading-relaxed">
+                    Install ke perangkat untuk akses cepat & mode offline.
+                  </p>
+                </div>
               </div>
-              <p className="text-[10px] text-slate-500 mb-2.5 leading-relaxed">
-                Install ke perangkat untuk akses cepat & mode offline.
-              </p>
               <button
                 onClick={handleInstall}
                 className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg
@@ -361,9 +378,8 @@ export const Sidebar: React.FC = () => {
           {isAdmin && (
             <button
               onClick={() => setAdminTab('settings')}
-              className={`p-1 transition-colors cursor-pointer ${
-                adminTab === 'settings' ? 'text-pink-600 font-bold' : 'text-slate-500 hover:text-pink-600'
-              }`}
+              className={`p-1 transition-colors cursor-pointer ${adminTab === 'settings' ? 'text-pink-600 font-bold' : 'text-slate-500 hover:text-pink-600'
+                }`}
               aria-label="Pengaturan"
             >
               <Settings className="h-4.5 w-4.5" />
