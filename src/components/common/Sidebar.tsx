@@ -17,6 +17,7 @@ import {
   Download,
   X,
   Trophy,
+  Bell,
 } from 'lucide-react';
 import { AvatarImage } from './AvatarImage';
 import logoImg from '../../assets/logo.png';
@@ -71,6 +72,8 @@ export const Sidebar: React.FC = () => {
     setTranslatorTab,
     currentTranslatorProfile,
     logout,
+    setIsNotificationDrawerOpen,
+    notifications,
   } = useApp();
 
   const [isExpanded, setIsExpanded] = useState<boolean>(getSavedSidebarState);
@@ -337,14 +340,44 @@ export const Sidebar: React.FC = () => {
           ═══════════════════════════════════════════════════════════════════════ */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 h-14
         bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-sm
-        flex items-center px-4"
+        flex items-center px-4 justify-between"
       >
         <img src={logoImg} alt="Master Translate" className="h-7 w-auto object-contain" />
 
-        <div className="ml-auto flex items-center gap-2">
-          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-            {isAdmin ? 'Admin Panel' : 'Penerjemah'}
-          </span>
+        <div className="flex items-center gap-3.5">
+          {/* Notification Button */}
+          <button
+            onClick={() => setIsNotificationDrawerOpen(true)}
+            className="p-1 text-slate-500 hover:text-pink-600 transition-colors relative cursor-pointer"
+            aria-label="Notifikasi"
+          >
+            <Bell className="h-4.5 w-4.5" />
+            {notifications.filter((n) => !n.read).length > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2 rounded-full bg-rose-500 ring-1 ring-white" />
+            )}
+          </button>
+
+          {/* Settings Button (Admin Only) */}
+          {isAdmin && (
+            <button
+              onClick={() => setAdminTab('settings')}
+              className={`p-1 transition-colors cursor-pointer ${
+                adminTab === 'settings' ? 'text-pink-600 font-bold' : 'text-slate-500 hover:text-pink-600'
+              }`}
+              aria-label="Pengaturan"
+            >
+              <Settings className="h-4.5 w-4.5" />
+            </button>
+          )}
+
+          {/* Logout Button */}
+          <button
+            onClick={() => logout()}
+            className="p-1 text-rose-500 hover:text-rose-600 transition-colors cursor-pointer"
+            aria-label="Keluar Sesi"
+          >
+            <LogOut className="h-4.5 w-4.5" />
+          </button>
         </div>
       </div>
 
