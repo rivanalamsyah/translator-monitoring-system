@@ -649,6 +649,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         await fsUpdateTranslator(translatorId, { status: nextStatus });
       }
 
+      // Send confirmation notification to the translator
+      if (currentTranslatorProfile) {
+        await fsAddNotification({
+          userId: currentTranslatorProfile.userId,
+          title: 'Tugas Berhasil Diserahkan',
+          message: `Hasil terjemahan Anda untuk "${task.title}" telah diserahkan dan sedang menunggu review Admin.`,
+          type: 'SUCCESS',
+          read: false,
+        });
+      }
+
+      // Send alert notification to the Admin
+      await fsAddNotification({
+        userId: 'admin-1',
+        title: 'Tugas Baru Menunggu Review',
+        message: `Penerjemah ${currentTranslatorProfile?.name || 'Penerjemah'} telah menyerahkan hasil untuk tugas "${task.title}".`,
+        type: 'INFO',
+        read: false,
+      });
+
       await fsAddActivityLog({
         userId: currentUser?.role === 'ADMIN' ? 'admin-1' : (currentTranslatorProfile?.userId || 'u-1'),
         userName: currentUser?.role === 'ADMIN' ? 'Admin' : (currentTranslatorProfile?.name || 'Translator'),
@@ -769,6 +789,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         };
 
         const id = await fsCreateTask(taskData as any);
+
+        // Notify all translators
+        await fsAddNotification({
+          userId: 'ALL',
+          title: 'Tugas Baru Tersedia',
+          message: `Tugas baru "${taskData.title}" (${pageCount} halaman) telah tersedia di Pool. Silakan klaim segera!`,
+          type: 'INFO',
+          read: false,
+        });
+
         await fsAddActivityLog({
           userId: 'admin-1',
           userName: 'Admin',
@@ -858,7 +888,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       successTitle: 'Penerjemah Terdaftar!',
       successMessage: `Akun dan profil untuk "${newTr.name}" berhasil dibuat.`,
       onConfirm: async () => {
-        await fsRegisterTranslatorCallable({
+        const res = await fsRegisterTranslatorCallable({
           email: newTr.email || '',
           password: newTr.password || '',
           name: newTr.name || '',
@@ -866,6 +896,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           languages: newTr.languages || ['EN-ID'],
           maxCapacityPoints: newTr.maxCapacityPoints || 20,
         });
+
+        if (res && res.uid) {
+          await fsAddNotification({
+            userId: res.uid,
+            title: 'Selamat Datang!',
+            message: `Akun penerjemah Anda berhasil didaftarkan. Selamat datang di Master Translate!`,
+            type: 'SUCCESS',
+            read: false,
+          });
+        }
 
         await fsAddActivityLog({
           userId: 'admin-1',
@@ -1052,7 +1092,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         type: 'danger',
         confirmText: 'Tutup',
         showCancel: false,
-        onConfirm: () => {},
+        onConfirm: () => { },
       });
       return;
     }
