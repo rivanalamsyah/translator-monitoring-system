@@ -152,25 +152,51 @@ export const ReportsView: React.FC = () => {
     const filename = `laporan_${activeReport}_${Date.now()}.pdf`;
 
     // 1. Draw Kop Surat (Header)
-    // Logo Mark - stylized custom graphic: a pink rounded square with 'MT' in white
-    doc.setFillColor(219, 39, 119); // Fuchsia-600
-    doc.roundedRect(14, 10, 15, 15, 3, 3, 'F');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(255, 255, 255);
-    doc.text('MT', 18, 20);
+    // Query DOM logo image from login or sidebar
+    const logoElement = document.querySelector('img[alt="Master Translate"]') as HTMLImageElement;
+    let logoW = 15;
+    let logoH = 15;
+    let hasLogo = false;
+
+    if (logoElement && logoElement.naturalWidth && logoElement.naturalHeight) {
+      const ratio = logoElement.naturalWidth / logoElement.naturalHeight;
+      logoH = 11;
+      logoW = logoH * ratio;
+      hasLogo = true;
+    }
+
+    if (hasLogo && logoElement) {
+      try {
+        doc.addImage(logoElement, 'PNG', 14, 11, logoW, logoH);
+      } catch (e) {
+        hasLogo = false;
+      }
+    }
+
+    if (!hasLogo) {
+      // Fallback
+      doc.setFillColor(219, 39, 119); // Fuchsia-600
+      doc.roundedRect(14, 10, 15, 15, 3, 3, 'F');
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(255, 255, 255);
+      doc.text('MT', 18, 20);
+      logoW = 15;
+    }
+
+    const textStartX = 14 + logoW + 5;
 
     // Company Name & Details
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(14);
+    doc.setFontSize(13);
     doc.setTextColor(30, 41, 59); // Slate-800
-    doc.text('MASTER TRANSLATE INDONESIA', 34, 15);
+    doc.text('MASTER TRANSLATE INDONESIA', textStartX, 15);
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8.5);
+    doc.setFontSize(7.5);
     doc.setTextColor(100, 116, 139); // Slate-500
-    doc.text('Jl. Kemang Raya No. 12, Mampang Prapatan, Jakarta Selatan 12730', 34, 20);
-    doc.text('Telp: +62 21-555-1234 | Email: info@mastertranslate.com | Web: www.mastertranslate.com', 34, 24);
+    doc.text('Plaza UNY, Jl. Affandi No.1 C Lt 3, Santren, Caturtunggal, Kec. Depok, Sleman, DI Yogyakarta 55581', textStartX, 20);
+    doc.text('Telp: +62 21-555-1234 | Email: info@mastertranslate.com | Web: www.mastertranslate.com', textStartX, 24);
 
     // Decorative Lines separating header
     doc.setDrawColor(219, 39, 119); // Fuchsia-600
