@@ -24,6 +24,23 @@ export const ReportsView: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [dateRange, setDateRange] = useState<'30days' | '7days' | 'all'>('30days');
 
+  const getExportFilename = (type: 'task' | 'translator' | 'productivity' | 'worktime' | 'points', extension: 'pdf' | 'xlsx') => {
+    const today = new Date();
+    const dd = String(today.getDate()).padStart(2, '0');
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const yyyy = today.getFullYear();
+    const dateStr = `${dd}-${mm}-${yyyy}`;
+
+    let reportName = 'Laporan';
+    if (type === 'task') reportName = 'Laporan_Operasional_Task_Pool';
+    else if (type === 'translator') reportName = 'Laporan_Kinerja_dan_Kapasitas_Penerjemah';
+    else if (type === 'productivity') reportName = 'Laporan_Produktivitas_Harian';
+    else if (type === 'worktime') reportName = 'Laporan_Waktu_Efektif_dan_Jeda_Penerjemah';
+    else if (type === 'points') reportName = 'Laporan_Profil_dan_Distribusi_Poin';
+
+    return `${reportName}_${dateStr}.${extension}`;
+  };
+
   // Filter tasks based on date range and search query
   const filteredTasks = useMemo(() => {
     return tasks.filter((task) => {
@@ -31,14 +48,14 @@ export const ReportsView: React.FC = () => {
         task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         task.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
         (task.translatorName || '').toLowerCase().includes(searchQuery.toLowerCase());
-      
+
       if (!matchSearch) return false;
 
       if (dateRange === 'all') return true;
       const createdDate = new Date(task.createdAt || Date.now());
       const now = new Date();
       const diffDays = (now.getTime() - createdDate.getTime()) / (1000 * 3600 * 24);
-      
+
       if (dateRange === '7days') return diffDays <= 7;
       return diffDays <= 30; // default 30 days
     });
@@ -47,7 +64,7 @@ export const ReportsView: React.FC = () => {
   // Productivity stats (completed tasks grouped by date)
   const productivityData = useMemo(() => {
     const groups: Record<string, { date: string; count: number; pages: number; points: number }> = {};
-    
+
     filteredTasks
       .filter((t) => t.status === 'COMPLETED')
       .forEach((t) => {
@@ -84,10 +101,9 @@ export const ReportsView: React.FC = () => {
     return totalPgs > 0 ? Math.round(totalSecs / totalPgs) : 0;
   }, [tasks]);
 
-  // Excel Export Handler using SheetJS
   const handleExportExcel = () => {
     let sheetData: any[] = [];
-    let filename = `laporan_${activeReport}_${Date.now()}.xlsx`;
+    const filename = getExportFilename(activeReport, 'xlsx');
 
     if (activeReport === 'task') {
       sheetData = filteredTasks.map((t) => ({
@@ -146,10 +162,9 @@ export const ReportsView: React.FC = () => {
     XLSX.writeFile(workbook, filename);
   };
 
-  // PDF Export Handler using jsPDF
   const handleExportPDF = () => {
     const doc = new jsPDF('p', 'mm', 'a4');
-    const filename = `laporan_${activeReport}_${Date.now()}.pdf`;
+    const filename = getExportFilename(activeReport, 'pdf');
 
     // 1. Draw Kop Surat (Header)
     // Query DOM logo image from login or sidebar
@@ -464,11 +479,10 @@ export const ReportsView: React.FC = () => {
           <button
             key={tab.id}
             onClick={() => setActiveReport(tab.id as any)}
-            className={`flex-1 md:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeReport === tab.id
+            className={`flex-1 md:flex-initial flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${activeReport === tab.id
                 ? 'bg-pink-500 text-white shadow-sm'
                 : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
-            }`}
+              }`}
           >
             <tab.icon className="h-3.5 w-3.5" />
             <span>{tab.label}</span>

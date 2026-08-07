@@ -272,7 +272,7 @@ export const AdminDashboard: React.FC = () => {
               return (
                 <div key={day.label} className="flex flex-col items-center gap-1 flex-1 group relative">
                   {/* Tooltip on hover */}
-                  <div className="opacity-0 group-hover:opacity-100 absolute -top-8 bg-slate-850 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md transition-opacity duration-150 pointer-events-none whitespace-nowrap shadow-md">
+                  <div className="opacity-0 group-hover:opacity-100 absolute -top-8 bg-slate-800 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-md transition-opacity duration-150 pointer-events-none whitespace-nowrap shadow-md">
                     {day.pages} hlm
                   </div>
                   <div className="w-full bg-slate-100 rounded-lg h-24 flex items-end overflow-hidden">
