@@ -1,152 +1,152 @@
-# Sistem Monitoring Penerjemah (Translator Monitoring System)
+# Translator Monitoring System (TMS)
 
-Sistem Monitoring Penerjemah (TMS) adalah aplikasi web modern single-page (SPA) berbasis **React (v19) + Vite + Tailwind CSS** yang dirancang untuk mengelola penugasan penerjemah secara efisien. Sistem ini menyediakan pemantauan waktu pengerjaan secara langsung (live timer), melacak kapasitas beban kerja (workload points), mengelola notifikasi, serta menyediakan alur persetujuan hasil terjemahan (approval workflow) bagi Super Admin.
+Sistem Monitoring Penerjemah (TMS) adalah platform web Enterprise Single-Page Application (SPA) berbasis **React 19** dan **Firebase** yang dirancang khusus untuk mendigitalisasi, mengotomatiskan, serta memantau seluruh siklus pengerjaan dokumen terjemahan oleh penerjemah (*translators*) secara real-time dan terukur.
 
-Aplikasi ini beroperasi dalam mode:
-- **Backend Firebase (Real-time & Transaksional):** Seluruh data operasional (tugas, log waktu, notifikasi, profil) disimpan dan dikelola langsung pada Firebase Auth dan Firestore. Alur transaksi klaim tugas dikelola secara transaksional untuk menjamin integritas data.
-- **State Caching (Local Storage):** LocalStorage browser hanya digunakan untuk menyimpan pengaturan lokal UI client, seperti preferensi tema (Light/Dark mode) dan tab menu aktif yang terbuka.
+Aplikasi ini mengusung pendekatan gamifikasi dengan melacak skor poin, badge pencapaian, tingkat level keaktifan, pemantauan timer pengerjaan, dan pembatasan beban kerja (*workload capacity*).
 
 ---
 
-## Desain & Antarmuka (Design System)
+## 🚀 Fitur Utama Sistem
 
-- **Tema Warna:** *Blush Workspace* (Clean, minimalis, perpaduan warna pink-white dengan kontras abu-abu lembut).
-- **Sistem Ikon:** Konsisten menggunakan **Lucide Icons** dengan gaya outline (18–20 px pada tombol/menu, 24–32 px pada card statistik).
-- **Aturan UI/UX:** Bebas dari emoji di seluruh antarmuka (termasuk dashboard, leaderboard, badge, status, notifikasi, tombol, maupun kartu statistik) untuk menjaga kesan bisnis yang profesional.
-- **Responsivitas:** Mendukung tampilan Desktop (dengan sidebar yang dapat diciutkan) dan Mobile (dengan Bottom Navigation modern dan profesional).
-
----
-
-## Akun Demo & Kredensial
-
-Gunakan akun berikut untuk melakukan uji coba sistem (baik untuk login di emulators maupun Firebase Production):
-
-### 1. Akun Super Admin (Akses Penuh)
-- **Nama:** Administrator
-- **Role:** `super_admin` (Admin Panel dengan 6 Menu)
-- **Email:** `admin@example.com`
-- **Password:** `Admin@2026Secure!`
-
-### 2. Akun Translator (Ruang Kerja Penerjemah)
-- **Role:** `translator` (Translator Panel dengan 4 Menu)
-- **Status Awal:** `FREE` (Siap Menerima Tugas)
-- **Password:** `Translator@2026!` (Berlaku untuk semua translator)
-- **Email Akun:**
-  - Andi Pratama: `andi.pratama@example.com`
-  - Putri Maharani: `putri.maharani@example.co` (Domain `.co`)
-  - Rina Lestari: `rina.lestari@example.com`
-  - Fajar Nugroho: `fajar.nugroho@example.com`
-  - Dewi Anggraini: `dewi.anggraini@example.com`
+* **Task Pool & Claiming System:** Penerjemah dapat secara mandiri mengklaim tugas yang dipublikasikan oleh Admin tanpa perlu penugasan manual, dengan pembatasan kapasitas beban kerja aktif.
+* **Live Timer & Time Tracking:** Penghitung waktu pengerjaan nyata (*live timer*) dengan fitur Start, Pause, Resume, dan Auto-idle Detection.
+* **Batas Jam Kerja & Hari Libur:** Validasi terenkripsi di mana pengerjaan timer hanya dapat diaktifkan pada jam operasional kantor (Senin-Jumat: 08.00-12.00 & 13.00-16.00; Sabtu: 08.00-12.00 & 13.00-14.00; Minggu: Libur).
+* **Manajemen Beban Kerja (Kapasitas Halaman):** Setiap penerjemah dibatasi beban pengerjaan aktifnya maksimal 20 halaman dokumen secara bersamaan guna menjamin SLA dan kualitas hasil kerja.
+* **Real-time Leaderboard & Gamifikasi:** Sistem peringkat berdasarkan akumulasi poin, level, dan badge (Newbie, Professional, Expert, Legend).
+* **Ekspor Laporan Modern (PDF & Excel):** Cetak laporan formal berdesain premium yang dilengkapi Kop Surat resmi, logo dinamis, dan tabel bergaris zebra.
+* **Arsitektur Real-time Sync:** sinkronisasi otomatis status penugasan, log waktu, dan notifikasi langsung ke klien menggunakan Firebase Firestore Listeners.
 
 ---
 
-## Menu Dashboard
+## 🛠️ Tech Stack (Teknologi yang Digunakan)
 
-### Dashboard Admin (6 Menu)
-1. **Dashboard** (`LayoutDashboard`): Ringkasan status operasional penerjemah dan aktivitas penugasan secara *real-time*.
-2. **Tugas** (`ClipboardList`): Mengelola pembuatan tugas baru dan alokasi penerjemah.
-3. **Penerjemah** (`Users`): Daftar profil penerjemah aktif dan metrik kapasitas beban kerja.
-4. **Leaderboard** (`Trophy`): Peringkat pencapaian poin pengerjaan penerjemah.
-5. **Laporan** (`BarChart3`): Analisis kinerja, SLA, dan visualisasi distribusi tugas.
-6. **Pengaturan** (`Settings`): Aturan poin per halaman, status auto-assign, dan preferensi notifikasi.
+### Frontend (Client-Side)
+* **Core Framework:** React (v19.0.0)
+* **Build Tool & Bundler:** Vite (v6.0)
+* **Styling & Design System:** Tailwind CSS (v3.4) & Vanilla CSS
+* **Ikonografi:** Lucide React
+* **Ekspor Dokumen:**
+  * **jsPDF (v2.5):** Untuk render grafik vector Kop Surat dan tabel berhalaman dinamis.
+  * **SheetJS / XLSX (v0.18):** Untuk ekspor data tabulasi ke Excel Spreadsheet.
+* **State Management:** React Context API & Zustand (Local UI state)
 
-### Dashboard Translator (4 Menu)
-1. **Dashboard** (`LayoutDashboard`): Monitor tugas aktif pengerjaan saat ini dengan kontrol start, pause, resume, dan submit.
-2. **Tugas** (`ClipboardList`): Pool Task yang tersedia untuk diklaim (*Task Claiming System*).
-3. **Leaderboard** (`Trophy`): Papan skor performa dan tingkatan badge pencapaian.
-4. **Profil** (`UserCircle`): Detail kontak, sertifikasi, kemampuan bahasa, dan sisa kapasitas beban kerja.
+### Backend & Database (Server-Side)
+* **Autentikasi Pengguna:** Firebase Authentication (dengan sinkronisasi RBAC Custom Claims).
+* **Database Utama:** Firebase Cloud Firestore (dengan aturan keamanan Role-Based Access Control terenkripsi).
+* **Penyimpanan Berkas:** Google Cloud Storage / Firebase Storage (untuk unggah hasil berkas dokumen).
 
 ---
 
-## Struktur Proyek & Analisis File
-
-Berikut adalah file inti yang digunakan dalam sistem (file mati/tidak digunakan telah dihapus):
+## 📂 Struktur Proyek
 
 ```text
-├── public/
-│   ├── assets/               # Aset statis favicon dan logo utama
-│   ├── icons/                # Ikon manifest untuk PWA
-│   └── offline.html          # Halaman fallback offline PWA
+├── .firebase/                # Firebase local cache & hosting configs
 ├── scripts/
-│   ├── seedFirestore.ts     # Script pengisi data awal Firestore (Idempotent)
-│   └── setCustomClaims.ts   # Script utility pengatur custom claims pengguna Auth
+│   ├── seedFirestore.ts     # Idempotent database seeder (1 Admin & 15 Penerjemah)
+│   └── setCustomClaims.ts   # Utilitas pengatur klaim otorisasi (claims role) admin/penerjemah
 ├── src/
-│   ├── assets/               # Aset gambar lokal (logo, avatar fallback)
+│   ├── assets/               # Aset gambar logo internal dan avatar fallback
 │   ├── components/
-│   │   ├── admin/           # Menu operasional Admin (Dashboard, List, Laporan)
-│   │   ├── common/          # Sidebar, BottomNav, CustomDialog, Badge, Leaderboard
-│   │   ├── modals/          # Modal input data baru dan formulir pengerjaan
-│   │   └── translator/      # Menu operasional Penerjemah (Dashboard, Profile)
+│   │   ├── admin/           # Menu Panel Admin (Dashboard, List Tugas, Laporan)
+│   │   ├── common/          # Sidebar, BottomNav, CustomDialog, Tabel Leaderboard
+│   │   ├── modals/          # Formulir penambahan data, jeda, dan serah pekerjaan
+│   │   └── translator/      # Menu Panel Penerjemah (Workspace & Profil)
 │   ├── context/
-│   │   └── AppContext.tsx   # Pengelola State Utama & Sinkronisasi Firestore
-│   ├── services/
-│   │   ├── authService.ts   # Login/Logout Auth Firebase
-│   │   └── firestoreService.ts # Real-time Listeners & Aksi Mutasi Firestore
+│   │   └── AppContext.tsx   # Global Context, Handlers Timer, dan validasi jam kerja
 │   ├── lib/
-│   │   ├── firebase.ts      # Inisialisasi Firebase Web SDK
-│   │   └── firebaseFlag.ts  # Konfigurasi mode operasi (Lokal vs Firebase)
+│   │   ├── firebase.ts      # Konfigurasi inisialisasi Firebase Web SDK
+│   │   └── firebaseFlag.ts  # Bendera opsi mode database (Lokal vs Firebase)
+│   ├── services/
+│   │   ├── authService.ts   # Autentikasi sesi login/logout Firebase
+│   │   └── firestoreService.ts # Listeners realtime, mutasi tugas, dan status translator
 │   ├── types/
-│   │   └── index.ts         # Definisi Interface TypeScript
+│   │   └── index.ts         # Definisi tipe data TypeScript (.d.ts / interfaces)
 │   └── utils/
-│       └── formatters.ts    # Pemformat durasi, waktu, mata uang, dan status
-├── firestore.rules          # Aturan Keamanan Database Firestore (RBAC)
-├── firebase.json            # Konfigurasi Firebase Hosting & Firestore Rules
-└── firestore.indexes.json   # Composite Indexes untuk query Firestore
+│       └── formatters.ts    # Formatting lokal durasi detik, rupiah, dan format tanggal
+├── AUTH.md                  # Daftar lengkap akun kredensial pengujian sistem
+├── firestore.rules          # Aturan keamanan database Firestore (Security Rules)
+├── firestore.indexes.json   # Pengindeksan komposit query Firestore
+└── firebase.json            # Konfigurasi hosting dan rules Firebase CLI
 ```
 
 ---
 
-## Langkah Instalasi & Pengoperasian Lokal
+## 🚀 Panduan Kloning & Instalasi Lokal
 
-### 1. Kloning dan Instalasi
-Pastikan Node.js terinstal di perangkat Anda, kemudian jalankan:
+Ikuti langkah-langkah di bawah ini untuk menjalankan aplikasi di lingkungan lokal Anda:
+
+### 1. Kloning Repositori
+Kloning repositori proyek ini dari GitHub ke komputer lokal Anda:
 ```bash
-# Install dependency dengan mengabaikan konflik peer dependency React 18/19 pada pustaka tes
+git clone https://github.com/rivanalamsyah/translator-monitoring-system.git
+cd translator-monitoring-system
+```
+
+### 2. Instalasi Dependency
+Pasang seluruh pustaka pustaka pendukung proyek dengan menggunakan perintah berikut (ditambahkan parameter `--legacy-peer-deps` untuk menghindari konflik library pengujian):
+```bash
 npm install --legacy-peer-deps
 ```
 
-### 2. Jalankan Mode Pengembangan (Local Storage)
-Secara default, `VITE_USE_FIREBASE=false` dapat disetel pada file `.env` untuk menjalankan simulasi database lokal menggunakan `localStorage` browser:
-```bash
-npm run dev
-```
-Akses aplikasi melalui browser di `http://localhost:3000`.
-
-### 3. Jalankan Mode Firebase (Production)
-Untuk menggunakan backend Firebase, setel environment variables di `.env.local`:
+### 3. Konfigurasi Environment Variables
+Buat berkas `.env` atau `.env.local` pada folder root proyek, kemudian lengkapi dengan konfigurasi Firebase App Anda:
 ```env
-VITE_FIREBASE_API_KEY=AIzaSy...
+VITE_FIREBASE_API_KEY=AIzaSyA5Xxxxxxx_xxxxxx
 VITE_FIREBASE_AUTH_DOMAIN=master-translator-monitoring.firebaseapp.com
 VITE_FIREBASE_PROJECT_ID=master-translator-monitoring
 VITE_FIREBASE_STORAGE_BUCKET=master-translator-monitoring.firebasestorage.app
 VITE_FIREBASE_MESSAGING_SENDER_ID=765738883690
 VITE_FIREBASE_APP_ID=1:765738883690:web:d6eba0a6a59e3bf5814813
 
+# Setel ke true untuk mengaktifkan koneksi Firebase backend.
+# Setel ke false jika hanya ingin mensimulasikan data via LocalStorage browser.
 VITE_USE_FIREBASE=true
 ```
 
-#### Menjalankan Script Database Seeder:
-1. Unduh file **Kunci Akun Layanan (Service Account Key JSON)** dari Firebase Console proyek Anda (**Project Settings > Service Accounts**).
-2. Simpan file tersebut di folder root proyek ini dengan nama `service-account.json`.
-3. Jalankan perintah seeder untuk membuat akun pertama:
-   ```bash
-   npx tsx scripts/seedFirestore.ts
-   ```
+### 4. Menjalankan Server Pengembangan Lokal
+Jalankan aplikasi dalam mode pengembangan lokal:
+```bash
+npm run dev
+```
+Aplikasi Anda akan berjalan di alamat **`http://localhost:3000`** (atau port lain yang tertera di terminal).
 
 ---
 
-## Kompilasi Produksi (Production Build)
+## 🗄️ Langkah Mengisi Data Awal Database (Seeding Firestore)
 
-Kompilasi kode frontend menjadi bundle statis yang dioptimalkan beserta Service Worker PWA:
+Untuk mengisi database Firestore Anda dengan **1 akun administrator utama**, **15 akun penerjemah demo**, serta riwayat poin dan beberapa sampel data penugasan, ikuti panduan berikut:
+
+1. Masuk ke **Firebase Console** proyek Anda.
+2. Navigasikan ke **Project Settings > Service Accounts**, lalu klik **Generate New Private Key**. Unduh berkas kunci tersebut.
+3. Simpan berkas JSON tersebut di dalam direktori root proyek ini dengan nama **`service-account.json`**.
+4. Jalankan perintah seeder di terminal Anda:
+   ```bash
+   npx tsx scripts/seedFirestore.ts
+   ```
+5. Setelah seeder selesai, Anda dapat menggunakan akun-akun tersebut untuk masuk ke sistem. Daftar lengkap kredensial demo tercantum pada file **[AUTH.md](file:///d:/translator-monitoring-system/AUTH.md)**.
+
+---
+
+## 📦 Kompilasi & Deployment Produksi (Build & Deploy)
+
+### Kompilasi Statis
+Kompilasi kode program ke dalam berkas statis siap rilis di folder `dist/`:
 ```bash
 npm run build
 ```
-Hasil build akan tersimpan di folder `dist/` dan siap dideploy ke Firebase Hosting.
 
-Gunakan kredensial demo berikut untuk masuk ke sistem:
-Login Sebagai Super Admin:
-Email: admin@example.com
-Password: Admin@2026Secure!
-Login Sebagai Penerjemah (Andi Pratama):
-Email: andi.pratama@example.com
-Password: Translator@2026!
+### Deploy ke Firebase Hosting
+Pastikan Anda sudah login ke Firebase CLI (`firebase login`), kemudian jalankan deploy:
+```bash
+firebase deploy --only hosting
+```
+
+---
+
+## 📬 Kontak Pengembang (Developer Contact)
+
+Jika Anda memiliki pertanyaan, kendala teknis, atau ingin mendiskusikan pengembangan lebih lanjut untuk platform ini, silakan hubungi pengembang utama:
+
+* **Nama:** Rivan Alamsyah
+* **GitHub:** [@rivanalamsyah](https://github.com/rivanalamsyah)
+* **Email:** [alamsyahrivan14@gmail.com](mailto:alamsyahrivan14@gmail.com)
