@@ -5,10 +5,17 @@ import { Info, CheckCircle2, AlertTriangle, XCircle, Loader2 } from 'lucide-reac
 export const CustomDialog: React.FC = () => {
   const { dialogState, closeDialog } = useApp();
   const modalRef = useRef<HTMLDivElement>(null);
+  const confirmClicked = useRef(false);
 
   const isOpen = !!(dialogState && dialogState.isOpen);
   const type = dialogState?.type;
   const onCancel = dialogState?.onCancel;
+
+  useEffect(() => {
+    if (isOpen) {
+      confirmClicked.current = false;
+    }
+  }, [isOpen]);
 
   // Handle ESC key and focus trapping
   useEffect(() => {
@@ -166,7 +173,11 @@ export const CustomDialog: React.FC = () => {
                   type="button"
                   data-type="confirm"
                   onClick={() => {
-                    if (onConfirm) onConfirm();
+                    if (confirmClicked.current) return;
+                    confirmClicked.current = true;
+                    if (onConfirm) {
+                      onConfirm();
+                    }
                   }}
                   className={`rounded-lg px-5 py-2 text-xs font-bold text-white shadow-md transition-all cursor-pointer ${theme.btn} focus:outline-none focus:ring-2`}
                 >

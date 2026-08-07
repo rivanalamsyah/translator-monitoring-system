@@ -226,6 +226,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       showCancel: options.showCancel !== false,
       onCancel: options.onCancel,
       onConfirm: async () => {
+        if (useTmsStore.getState().dialogState.type === 'loading') {
+          return;
+        }
         store.setDialogState((prev) => ({
           ...prev,
           type: 'loading',
