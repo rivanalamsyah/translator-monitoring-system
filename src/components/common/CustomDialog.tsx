@@ -136,7 +136,7 @@ export const CustomDialog: React.FC = () => {
               <p className="text-[11px] font-medium text-slate-400 animate-pulse">
                 Silakan tunggu beberapa saat...
               </p>
-            ) : type === 'success' || type === 'info' || (type === 'danger' && !onConfirm) ? (
+            ) : !onConfirm ? (
               <button
                 type="button"
                 data-type="close"
